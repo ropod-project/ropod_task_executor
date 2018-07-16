@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package>
+  <name>ropod_task_executor</name>
+  <version>0.1.0</version>
+  <description>Executes tasks provided by fleet management</description>
+
+  <maintainer email="argentina.ortega@h-brs.de">Argentina Ortega</maintainer>
+  <maintainer email="santosh.thoduka@h-brs.de">Santosh Thoduka</maintainer>
+
+  <author email="santosh.thoduka@h-brs.de">Santosh Thoduka</author>
+  <license>GPLv3</license>
+  <url type="website">http://ropod.org/</url>
+
+  <build_depend>ropod_ros_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+
+  <run_depend>roscpp</run_depend>
+  <run_depend>ropod_ros_msgs</run_depend>
+
+  <buildtool_depend>catkin</buildtool_depend>
+</package>

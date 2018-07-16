@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="ropod_task_executor" type="ropod_task_executor" name="ropod_task_executor" output="screen">
+        <remap from="~task" to="/ropod_com_mediator/task" />
+    </node>
+</launch>
