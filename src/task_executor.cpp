@@ -33,6 +33,7 @@ void TaskExecutor::run()
     {
         if (received_task)
         {
+            ROS_INFO_STREAM("Received new task");
             state = DISPATCHING_ACTION;
             current_action_index = 0;
             current_action_id = "";
@@ -49,6 +50,7 @@ void TaskExecutor::run()
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
+        ROS_INFO_STREAM("Dispatching action: " << action.name << " ID: " << action.action_id);
         if (action.type == "GOTO")
         {
             action_goto_pub.publish(action);
@@ -56,13 +58,17 @@ void TaskExecutor::run()
         }
         else if (action.type == "DOCK")
         {
-            action_dock_pub.publish(action);
-            current_action_type = DOCK;
+            ROS_WARN_STREAM("DOCK action currently unsupported");
+            current_action_index++;
+            current_action_id = "";
+            return;
         }
         else if (action.type == "UNDOCK")
         {
-            action_undock_pub.publish(action);
-            current_action_type = UNDOCK;
+            ROS_WARN_STREAM("UNDOCK action currently unsupported");
+            current_action_index++;
+            current_action_id = "";
+            return;
         }
         else if (action.type == "REQUEST_ELEVATOR")
         {
@@ -72,7 +78,10 @@ void TaskExecutor::run()
         }
         else if (action.type == "ENTER_ELEVATOR")
         {
-            current_action_type = ENTER_ELEVATOR;
+            ROS_WARN_STREAM("ENTER_ELEVATOR action currently unsupported");
+            current_action_index++;
+            current_action_id = "";
+            return;
         }
         else
         {
