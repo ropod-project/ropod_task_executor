@@ -50,7 +50,7 @@ void TaskExecutor::run()
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
-        ROS_INFO_STREAM("Dispatching action: " << action.name << " ID: " << action.action_id);
+        ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
         {
             action_goto_pub.publish(action);
