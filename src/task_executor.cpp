@@ -108,13 +108,30 @@ void TaskExecutor::run()
             if (elevator_reply)
             {
                 std::cout << "Received elevator request reply " << std::endl;
-                // TODO: make sure we get reply from the correct query
-                if (elevator_reply->query_success)
+                std::cout << "Expected query id: " << current_elevator_query_id << " received query id: " << elevator_reply->query_id << std::endl;
+                if (elevator_reply->query_success && current_elevator_query_id == elevator_reply->query_id)
                 {
+                    current_elevator_query_id = "";
                     std::string wp = elevator_reply->elevator_waypoint;
-                    // send go to elevator_reply->waypoint here
+
+                    ropod_ros_msgs::Action goto_action;
+
+                    boost::uuids::uuid uuid = boost::uuids::random_generator()();
+                    std::stringstream ss;
+                    ss << uuid;
+                    goto_action.action_id = ss.str();
+
+                    goto_action.type = "GOTO";
+                    ropod_ros_msgs::Area area;
+                    area.name = wp;
+                    goto_action.areas.push_back(area);
+
+                    ROS_INFO_STREAM("Dispatching action to elevator waypoint: " << elevator_reply->elevator_waypoint);
+                    action_goto_pub.publish(goto_action);
                     elevator_reply = nullptr;
+
                     current_action_type = GOTO_ELEVATOR;
+                    state = EXECUTING_ACTION;
                     action_ongoing = true;
                 }
             }
@@ -140,6 +157,7 @@ void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const s
     std::stringstream ss;
     ss << uuid;
     er.query_id = ss.str();
+    current_elevator_query_id = er.query_id;
     er.command = "CALL_ELEVATOR";
     er.start_floor = action.start_floor;
     er.goal_floor = action.goal_floor;

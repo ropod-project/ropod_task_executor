@@ -137,6 +137,11 @@ private:
     std::string current_action_id;
 
     /**
+     * Query ID for current elevator request
+     */
+    std::string current_elevator_query_id;
+
+    /**
      * callback for reply to elevator request
      */
     void elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg);
