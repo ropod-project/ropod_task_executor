@@ -4,7 +4,9 @@
         <remap from="~task" to="/ropod_com_mediator/task" />
         <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
         <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
-        <remap from="~progress_goto_in" to="/route_navigation/progress" />
-        <remap from="~progress_goto_out" to="/ropod_com_mediator/ropod_task_feedback" />
+        <remap from="~progress_goto_in" to="/task_progress/goto" />
+        <remap from="~progress_dock_in" to="/task_progress/dock" />
+        <remap from="~progress_goto_out" to="/ropod_com_mediator/ropod_task_feedback/goto" />
+        <remap from="~progress_dock_out" to="/ropod_com_mediator/ropod_task_feedback/dock" />
     </node>
 </launch>

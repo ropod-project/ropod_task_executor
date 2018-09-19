@@ -4,11 +4,12 @@
 #include <ros/ros.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
+#include <ropod_ros_msgs/TaskProgressDOCK.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/Waypoint.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
-#include <ropod_ros_msgs/ropod_demo_plan.h>
+// #include <ropod_ros_msgs/ropod_demo_plan.h>
 
 /**
  * Executor of tasks sent by fleet management.
@@ -71,6 +72,11 @@ private:
     ros::Subscriber task_progress_goto_sub;
 
     /**
+     * Subscriber for TaskProgressDOCK messages (from navigation)
+     */
+    ros::Subscriber task_progress_dock_sub;
+
+    /**
      * Publisher for task and action feedback
      */
     ros::Publisher task_feedback_pub;
@@ -99,6 +105,11 @@ private:
      * Publisher for sending TaskProgressGOTO messages (to com mediator)
      */
     ros::Publisher task_progress_goto_pub;
+
+    /**
+     * Publisher for sending TaskProgressGOTO messages (to com mediator)
+     */
+    ros::Publisher task_progress_dock_pub;
 
     /**
      * Reply to elevator request
@@ -155,6 +166,11 @@ private:
      * Subscriber callback for task progress messages for GOTO actions
      */
     void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+
+    /**
+     * Subscriber callback for task progress messages for GOTO actions
+     */
+    void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
 
 
     /**
