@@ -25,7 +25,7 @@ catkin_package(
 add_executable(ropod_task_executor
     src/task_executor.cpp
 )
-add_dependencies(ropod_task_executor ropod_ros_msgs_gencpp)
+add_dependencies(ropod_task_executor ropod_ros_msgs_generate_messages_cpp)
 
 target_link_libraries(ropod_task_executor
     ${catkin_LIBRARIES}
