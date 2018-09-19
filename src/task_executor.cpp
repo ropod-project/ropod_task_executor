@@ -70,7 +70,7 @@ void TaskExecutor::run()
         else if (action.type == "UNDOCK")
         {
             // ROS_WARN_STREAM("UNDOCK action currently unsupported");
-            action_dock_pub.publish(action);
+            action_undock_pub.publish(action);
             current_action_type = UNDOCK;
             // current_action_index++;
             // current_action_id = "";
