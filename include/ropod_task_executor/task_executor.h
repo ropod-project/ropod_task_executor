@@ -5,6 +5,7 @@
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
 #include <ropod_ros_msgs/TaskProgressDOCK.h>
+#include <ropod_ros_msgs/Status.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/Waypoint.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
@@ -50,6 +51,16 @@ private:
      * Current state in internal state machine
      */
     State state;
+
+    /**
+     * Current state in internal state machine
+     */
+    ropod_ros_msgs::Status task_status;
+
+    /**
+     * Current state in internal state machine
+     */
+    bool last_action;
 
     /**
      * ros private node handle

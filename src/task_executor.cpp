@@ -36,9 +36,11 @@ void TaskExecutor::run()
         if (received_task)
         {
             ROS_INFO_STREAM("Received new task");
+            task_status.status_code = ropod_ros_msgs::Status::ONGOING;
             state = DISPATCHING_ACTION;
             current_action_index = 0;
             current_action_id = "";
+            last_action = false;
         }
         return;
     }
@@ -47,10 +49,16 @@ void TaskExecutor::run()
         if (current_action_index >= current_task->robot_actions.size())
         {
             state = TASK_DONE;
+            task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
             return;
         }
+
+        if (current_action_index == current_task->robot_actions.size())
+            last_action = true;
+
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
+        task_status.status_code = ropod_ros_msgs::Status::ONGOING;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
@@ -94,6 +102,7 @@ void TaskExecutor::run()
             ROS_ERROR_STREAM("Got invalid action: " << action.type);
             ROS_ERROR_STREAM("Stopping task execution");
             action_ongoing = false;
+            task_status.status_code = ropod_ros_msgs::Status::FAILED;
             state = INIT;
             return;
         }
@@ -138,6 +147,7 @@ void TaskExecutor::run()
 
                     current_action_type = GOTO_ELEVATOR;
                     state = EXECUTING_ACTION;
+                    task_status.status_code = ropod_ros_msgs::Status::ONGOING;
                     action_ongoing = true;
                 }
             }
@@ -178,6 +188,7 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     {
         ROS_WARN_STREAM("Cancelling previous task");
         // TODO: properly cancel an ongoing task
+        // TODO: send cancel status back to FMS
         action_ongoing = false;
         current_action_index = 0;
         current_action_id = "";
@@ -195,9 +206,18 @@ void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestRe
 void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
+    if (last_action)
+    {
+        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
     task_progress_goto_pub.publish(*msg);
 
-    if (msg->status == ropod_ros_msgs::TaskProgressGOTO::REACHED &&
+    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED &&
         msg->sequenceNumber == msg->totalNumber &&
         msg->action_id == current_action_id)
     {
@@ -209,14 +229,23 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
 void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
+    if (last_action)
+    {
+        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
     task_progress_goto_pub.publish(*msg);
 
-    if (msg->status == ropod_ros_msgs::TaskProgressDOCK::DOCKED &&
+    if (msg->status.status_code == ropod_ros_msgs::Status::DOCKED &&
         msg->action_id == current_action_id)
     {
         action_ongoing = false;
     }
-    else if (msg->status == ropod_ros_msgs::TaskProgressDOCK::UNDOCKED &&
+    else if (msg->status.status_code == ropod_ros_msgs::Status::UNDOCKED &&
              msg->action_id == current_action_id)
     {
         action_ongoing = false;
