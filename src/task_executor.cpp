@@ -238,7 +238,7 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
         msg ->task_status.status_code = task_status.status_code;
     }
 
-    task_progress_goto_pub.publish(*msg);
+    task_progress_dock_pub.publish(*msg);
 
     if (msg->status.status_code == ropod_ros_msgs::Status::DOCKED &&
         msg->action_id == current_action_id)
