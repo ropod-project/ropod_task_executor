@@ -20,7 +20,9 @@ TaskExecutor::TaskExecutor() :
     elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
 
     task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
+    task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
     task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this);
+    task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this);
 }
 
 TaskExecutor::~TaskExecutor()
@@ -34,9 +36,11 @@ void TaskExecutor::run()
         if (received_task)
         {
             ROS_INFO_STREAM("Received new task");
+            task_status.status_code = ropod_ros_msgs::Status::ONGOING;
             state = DISPATCHING_ACTION;
             current_action_index = 0;
             current_action_id = "";
+            last_action = false;
         }
         return;
     }
@@ -45,10 +49,18 @@ void TaskExecutor::run()
         if (current_action_index >= current_task->robot_actions.size())
         {
             state = TASK_DONE;
+            task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
             return;
         }
+
+        if (current_action_index == current_task->robot_actions.size())
+        {
+            last_action = true;
+        }
+
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
+        task_status.status_code = ropod_ros_msgs::Status::ONGOING;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
@@ -58,17 +70,13 @@ void TaskExecutor::run()
         }
         else if (action.type == "DOCK")
         {
-            ROS_WARN_STREAM("DOCK action currently unsupported");
-            current_action_index++;
-            current_action_id = "";
-            return;
+            action_dock_pub.publish(action);
+            current_action_type = DOCK;
         }
         else if (action.type == "UNDOCK")
         {
-            ROS_WARN_STREAM("UNDOCK action currently unsupported");
-            current_action_index++;
-            current_action_id = "";
-            return;
+            action_undock_pub.publish(action);
+            current_action_type = UNDOCK;
         }
         else if (action.type == "REQUEST_ELEVATOR")
         {
@@ -88,6 +96,7 @@ void TaskExecutor::run()
             ROS_ERROR_STREAM("Got invalid action: " << action.type);
             ROS_ERROR_STREAM("Stopping task execution");
             action_ongoing = false;
+            task_status.status_code = ropod_ros_msgs::Status::FAILED;
             state = INIT;
             return;
         }
@@ -132,6 +141,7 @@ void TaskExecutor::run()
 
                     current_action_type = GOTO_ELEVATOR;
                     state = EXECUTING_ACTION;
+                    task_status.status_code = ropod_ros_msgs::Status::ONGOING;
                     action_ongoing = true;
                 }
             }
@@ -172,6 +182,7 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     {
         ROS_WARN_STREAM("Cancelling previous task");
         // TODO: properly cancel an ongoing task
+        // TODO: send cancel status back to FMS
         action_ongoing = false;
         current_action_index = 0;
         current_action_id = "";
@@ -189,15 +200,52 @@ void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestRe
 void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
+    if (last_action)
+    {
+        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
     task_progress_goto_pub.publish(*msg);
 
-    if (msg->status == "reached"  &&
+    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED &&
         msg->sequenceNumber == msg->totalNumber &&
         msg->action_id == current_action_id)
     {
         action_ongoing = false;
     }
 }
+
+
+void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+{
+    msg->task_id = current_task->task_id;
+    if (last_action)
+    {
+        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
+    task_progress_dock_pub.publish(*msg);
+
+    if (msg->status.status_code == ropod_ros_msgs::Status::DOCKED &&
+        msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
+    else if (msg->status.status_code == ropod_ros_msgs::Status::UNDOCKED &&
+             msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
+}
+
 
 int main(int argc, char **argv)
 {
