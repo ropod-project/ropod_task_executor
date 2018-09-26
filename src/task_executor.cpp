@@ -54,7 +54,9 @@ void TaskExecutor::run()
         }
 
         if (current_action_index == current_task->robot_actions.size())
+        {
             last_action = true;
+        }
 
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
@@ -68,21 +70,13 @@ void TaskExecutor::run()
         }
         else if (action.type == "DOCK")
         {
-            // ROS_WARN_STREAM("DOCK action currently unsupported");
             action_dock_pub.publish(action);
             current_action_type = DOCK;
-            // current_action_index++;
-            // current_action_id = "";
-            // return;
         }
         else if (action.type == "UNDOCK")
         {
-            // ROS_WARN_STREAM("UNDOCK action currently unsupported");
             action_undock_pub.publish(action);
             current_action_type = UNDOCK;
-            // current_action_index++;
-            // current_action_id = "";
-            // return;
         }
         else if (action.type == "REQUEST_ELEVATOR")
         {

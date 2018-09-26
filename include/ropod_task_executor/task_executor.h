@@ -10,7 +10,6 @@
 #include <ropod_ros_msgs/Waypoint.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
-// #include <ropod_ros_msgs/ropod_demo_plan.h>
 
 /**
  * Executor of tasks sent by fleet management.
@@ -53,12 +52,12 @@ private:
     State state;
 
     /**
-     * Current state in internal state machine
+     * Current task status
      */
     ropod_ros_msgs::Status task_status;
 
     /**
-     * Current state in internal state machine
+     * Flag indicating whether the current action is the last action in the task
      */
     bool last_action;
 
@@ -118,7 +117,7 @@ private:
     ros::Publisher task_progress_goto_pub;
 
     /**
-     * Publisher for sending TaskProgressGOTO messages (to com mediator)
+     * Publisher for sending TaskProgressDOCK messages (to com mediator)
      */
     ros::Publisher task_progress_dock_pub;
 
@@ -179,7 +178,7 @@ private:
     void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
 
     /**
-     * Subscriber callback for task progress messages for GOTO actions
+     * Subscriber callback for task progress messages for DOCK actions
      */
     void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
 
