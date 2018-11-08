@@ -3,6 +3,9 @@
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc
 
+#include <ros/serialization.h>
+
+#include <bsoncxx/types.hpp>
 TaskExecutor::TaskExecutor() :
     state(INIT),
     nh("~"),
@@ -10,6 +13,11 @@ TaskExecutor::TaskExecutor() :
     action_ongoing(false),
     current_action_index(-1)
 {
+    nh.param<std::string>("db_name", db_name, "task_execution");
+    nh.param<std::string>("collection_name", collection_name, "queued_tasks");
+
+    mongo_client = std::make_shared<mongocxx::client>(mongocxx::uri{});
+
     task_sub = nh.subscribe("task", 1, &TaskExecutor::taskCallback, this);
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
     action_goto_pub = nh.advertise<ropod_ros_msgs::Action>("GOTO", 1);
@@ -37,6 +45,21 @@ void TaskExecutor::run()
             state = DISPATCHING_ACTION;
             current_action_index = 0;
             current_action_id = "";
+        }
+        else
+        {
+            ropod_ros_msgs::Task::Ptr new_task;
+            bool task_exists = getNextTask(new_task);
+            if (task_exists)
+            {
+                current_task = new_task;
+                received_task = true;
+
+                ROS_INFO_STREAM("Starting new task: " << new_task->task_id);
+                state = DISPATCHING_ACTION;
+                current_action_index = 0;
+                current_action_id = "";
+            }
         }
         return;
     }
@@ -170,15 +193,15 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 {
     if (state != INIT)
     {
-        ROS_WARN_STREAM("Cancelling previous task");
-        // TODO: properly cancel an ongoing task
-        action_ongoing = false;
-        current_action_index = 0;
-        current_action_id = "";
-        state = DISPATCHING_ACTION;
+        ROS_WARN_STREAM("Received new task during execution. Adding to queue");
+        queueTask(msg, "queued");
     }
-    current_task = msg;
-    received_task = true;
+    else
+    {
+        queueTask(msg, "active");
+        current_task = msg;
+        received_task = true;
+    }
 }
 
 void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
@@ -197,6 +220,50 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
     {
         action_ongoing = false;
     }
+}
+
+void TaskExecutor::queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status)
+{
+    auto coll = (*mongo_client)[db_name][collection_name];
+    bsoncxx::builder::stream::document document{};
+
+    uint32_t serial_size = ros::serialization::serializationLength(*task);
+    boost::shared_array<uint8_t> buffer(new uint8_t[serial_size]);
+    ros::serialization::OStream stream(buffer.get(), serial_size);
+    ros::serialization::serialize(stream, *task);
+
+    bsoncxx::types::b_binary task_data{bsoncxx::binary_sub_type::k_binary,
+                              serial_size,
+                              buffer.get()};
+    document << "task_id" << task->task_id;
+    document << "task_status" << status;
+    document << "queue_time" << bsoncxx::types::b_date(std::chrono::system_clock::now());
+    document << "task_msg" << task_data;
+    coll.insert_one(document.view());
+}
+
+bool TaskExecutor::getNextTask(ropod_ros_msgs::Task::Ptr &task)
+{
+    auto coll = (*mongo_client)[db_name][collection_name];
+    auto doc = coll.find_one({}); // this will get the earliest inserted document
+    if (doc)
+    {
+        task = boost::make_shared<ropod_ros_msgs::Task>();
+        std::string task_id = doc.value().view()["task_id"].get_utf8().value.to_string();
+        uint32_t serial_size = doc.value().view()["task_msg"].get_binary().size;
+        ros::serialization::IStream stream((uint8_t*)(doc.value().view()["task_msg"].get_binary().bytes), serial_size);
+        ros::serialization::Serializer<ropod_ros_msgs::Task>::read(stream, *task);
+
+        // set status of task to active
+        using bsoncxx::builder::stream::document;
+        using bsoncxx::builder::stream::open_document;
+        using bsoncxx::builder::stream::close_document;
+        using bsoncxx::builder::stream::finalize;
+        coll.update_one(document{} << "task_id" << task_id << finalize,
+                        document{} << "$set" << open_document << "status" << "active" << close_document << finalize);
+        return true;
+    }
+    return false;
 }
 
 int main(int argc, char **argv)
