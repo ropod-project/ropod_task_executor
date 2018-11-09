@@ -2,21 +2,32 @@
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc
-
 #include <ros/serialization.h>
-
 #include <bsoncxx/types.hpp>
+
+using bsoncxx::builder::stream::document;
+using bsoncxx::builder::stream::open_document;
+using bsoncxx::builder::stream::close_document;
+using bsoncxx::builder::stream::finalize;
+
 TaskExecutor::TaskExecutor() :
+    FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator"}),
     state(INIT),
     nh("~"),
     received_task(false),
     action_ongoing(false),
     current_action_index(-1)
 {
+}
+
+TaskExecutor::~TaskExecutor()
+{
+}
+
+std::string TaskExecutor::init()
+{
     nh.param<std::string>("db_name", db_name, "task_execution");
     nh.param<std::string>("collection_name", collection_name, "queued_tasks");
-
-    mongo_client = std::make_shared<mongocxx::client>(mongocxx::uri{});
 
     task_sub = nh.subscribe("task", 1, &TaskExecutor::taskCallback, this);
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
@@ -29,46 +40,52 @@ TaskExecutor::TaskExecutor() :
 
     task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
     task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this);
+
+    return FTSMTransitions::INITIALISED;
 }
 
-TaskExecutor::~TaskExecutor()
+std::string TaskExecutor::configuring()
 {
+    return FTSMTransitions::DONE_CONFIGURING;
 }
 
-void TaskExecutor::run()
+std::string TaskExecutor::ready()
 {
-    if (state == INIT)
+    if (received_task)
     {
-        if (received_task)
+        ROS_INFO_STREAM("Received new task");
+        state = DISPATCHING_ACTION;
+        current_action_index = 0;
+        current_action_id = "";
+        return FTSMTransitions::RUN;
+    }
+    else
+    {
+        ropod_ros_msgs::Task::Ptr new_task;
+        bool task_exists = getNextTask(new_task);
+        if (task_exists)
         {
-            ROS_INFO_STREAM("Received new task");
+            current_task = new_task;
+            received_task = true;
+
+            ROS_INFO_STREAM("Starting new task: " << new_task->task_id);
             state = DISPATCHING_ACTION;
             current_action_index = 0;
             current_action_id = "";
+            return FTSMTransitions::RUN;
         }
-        else
-        {
-            ropod_ros_msgs::Task::Ptr new_task;
-            bool task_exists = getNextTask(new_task);
-            if (task_exists)
-            {
-                current_task = new_task;
-                received_task = true;
-
-                ROS_INFO_STREAM("Starting new task: " << new_task->task_id);
-                state = DISPATCHING_ACTION;
-                current_action_index = 0;
-                current_action_id = "";
-            }
-        }
-        return;
+        return FTSMTransitions::WAIT;
     }
-    else if (state == DISPATCHING_ACTION)
+}
+
+std::string TaskExecutor::running()
+{
+    if (state == DISPATCHING_ACTION)
     {
         if (current_action_index >= current_task->robot_actions.size())
         {
             state = TASK_DONE;
-            return;
+            return FTSMTransitions::WAIT;
         }
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
@@ -84,14 +101,14 @@ void TaskExecutor::run()
             ROS_WARN_STREAM("DOCK action currently unsupported");
             current_action_index++;
             current_action_id = "";
-            return;
+            return FTSMTransitions::WAIT;
         }
         else if (action.type == "UNDOCK")
         {
             ROS_WARN_STREAM("UNDOCK action currently unsupported");
             current_action_index++;
             current_action_id = "";
-            return;
+            return FTSMTransitions::WAIT;
         }
         else if (action.type == "REQUEST_ELEVATOR")
         {
@@ -104,7 +121,7 @@ void TaskExecutor::run()
             ROS_WARN_STREAM("ENTER_ELEVATOR action currently unsupported");
             current_action_index++;
             current_action_id = "";
-            return;
+            return FTSMTransitions::CONTINUE;
         }
         else
         {
@@ -112,10 +129,10 @@ void TaskExecutor::run()
             ROS_ERROR_STREAM("Stopping task execution");
             action_ongoing = false;
             state = INIT;
-            return;
+            return FTSMTransitions::DONE;
         }
         state = EXECUTING_ACTION;
-        return;
+        return FTSMTransitions::CONTINUE;
     }
     else if (state == EXECUTING_ACTION)
     {
@@ -124,7 +141,7 @@ void TaskExecutor::run()
             current_action_index++;
             current_action_id = "";
             state = DISPATCHING_ACTION;
-            return;
+            return FTSMTransitions::CONTINUE;
         }
         if (current_action_type == REQUEST_ELEVATOR)
         {
@@ -159,7 +176,7 @@ void TaskExecutor::run()
                 }
             }
         }
-        return;
+        return FTSMTransitions::CONTINUE;
     }
     else if (state == TASK_DONE)
     {
@@ -169,8 +186,14 @@ void TaskExecutor::run()
         action_ongoing = false;
         state = INIT;
         std::cout << "Task done! " << std::endl;
-        return;
+        removeTask(current_task->task_id);
+        return FTSMTransitions::DONE;
     }
+}
+
+std::string TaskExecutor::recovering()
+{
+    return FTSMTransitions::DONE_RECOVERING;
 }
 
 void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const std::string &task_id, const std::string &cart_type)
@@ -214,7 +237,7 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
     msg->task_id = current_task->task_id;
     task_progress_goto_pub.publish(*msg);
 
-    if (msg->status == "reached"  &&
+    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED  &&
         msg->sequenceNumber == msg->totalNumber &&
         msg->action_id == current_action_id)
     {
@@ -224,7 +247,8 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
 
 void TaskExecutor::queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status)
 {
-    auto coll = (*mongo_client)[db_name][collection_name];
+    mongocxx::client client(mongocxx::uri{});
+    auto coll = client[db_name][collection_name];
     bsoncxx::builder::stream::document document{};
 
     uint32_t serial_size = ros::serialization::serializationLength(*task);
@@ -244,7 +268,8 @@ void TaskExecutor::queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::s
 
 bool TaskExecutor::getNextTask(ropod_ros_msgs::Task::Ptr &task)
 {
-    auto coll = (*mongo_client)[db_name][collection_name];
+    mongocxx::client client(mongocxx::uri{});
+    auto coll = client[db_name][collection_name];
     auto doc = coll.find_one({}); // this will get the earliest inserted document
     if (doc)
     {
@@ -255,16 +280,20 @@ bool TaskExecutor::getNextTask(ropod_ros_msgs::Task::Ptr &task)
         ros::serialization::Serializer<ropod_ros_msgs::Task>::read(stream, *task);
 
         // set status of task to active
-        using bsoncxx::builder::stream::document;
-        using bsoncxx::builder::stream::open_document;
-        using bsoncxx::builder::stream::close_document;
-        using bsoncxx::builder::stream::finalize;
         coll.update_one(document{} << "task_id" << task_id << finalize,
-                        document{} << "$set" << open_document << "status" << "active" << close_document << finalize);
+                        document{} << "$set" << open_document << "task_status" << "active" << close_document << finalize);
         return true;
     }
     return false;
 }
+
+void TaskExecutor::removeTask(const std::string &task_id)
+{
+    mongocxx::client client(mongocxx::uri{});
+    auto coll = client[db_name][collection_name];
+    coll.delete_one(document{} << "task_id" << task_id << finalize);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -273,10 +302,11 @@ int main(int argc, char **argv)
     ROS_INFO("Ready.");
 
     ros::Rate loop_rate(10);
+    te.run();
     while (ros::ok())
     {
         ros::spinOnce();
-        te.run();
+        //std::cout << "finished running" << std::endl;
         loop_rate.sleep();
     }
 

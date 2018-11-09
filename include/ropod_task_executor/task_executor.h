@@ -13,7 +13,10 @@
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
 
+#include <ftsm_base.h>
 
+
+using namespace ftsm;
 /**
  * Executor of tasks sent by fleet management.
  * Also publishes feedback when intermediate actions are complete,
@@ -21,7 +24,7 @@
  *
  * @author Santosh Thoduka
  */
-class TaskExecutor
+class TaskExecutor : public FTSMBase
 {
 private:
     /**
@@ -161,11 +164,6 @@ private:
     mongocxx::instance mongo_instance;
 
     /**
-     * Mongodb client
-     */
-    std::shared_ptr<mongocxx::client> mongo_client;
-
-    /**
      * callback for reply to elevator request
      */
     void elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg);
@@ -200,14 +198,22 @@ private:
      */
     bool getNextTask(ropod_ros_msgs::Task::Ptr &task);
 
+    /**
+     * Remove a task from the queue
+     */
+    void removeTask(const std::string &task_id);
+
 public:
     TaskExecutor();
     virtual ~TaskExecutor();
 
-    /**
-     * Main loop; dispatches actions one by one
-     */
-    void run();
+
+    std::string init();
+    std::string configuring();
+    std::string ready();
+    std::string running();
+    std::string recovering();
+
 };
 
 #endif /* TASK_EXECUTOR_H */
