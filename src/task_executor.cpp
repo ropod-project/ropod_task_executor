@@ -216,8 +216,15 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 {
     if (state != INIT)
     {
-        ROS_WARN_STREAM("Received new task during execution. Adding to queue");
-        queueTask(msg, "queued");
+        if (msg->task_id != current_task->task_id)
+        {
+            ROS_WARN_STREAM("Received new task during execution. Adding to queue");
+            queueTask(msg, "queued");
+        }
+        else
+        {
+            ROS_WARN_STREAM("Received same task_id (" << msg->task_id << ") as currently executing task. Ignoring.");
+        }
     }
     else
     {
