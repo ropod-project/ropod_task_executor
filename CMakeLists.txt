@@ -42,7 +42,7 @@ add_executable(ropod_task_executor
     /opt/ropod/ropod_common/ropodcpp/ftsm/src/ftsm_base.cpp
     /opt/ropod/ftsm/cppftsm/src/ftsm.cpp
 )
-add_dependencies(ropod_task_executor ropod_ros_msgs_gencpp)
+add_dependencies(ropod_task_executor ropod_ros_msgs_generate_messages_cpp)
 
 target_link_libraries(ropod_task_executor
   ${LIBMONGOCXX_LIBRARIES}

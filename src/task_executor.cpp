@@ -39,8 +39,9 @@ std::string TaskExecutor::init()
     elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
 
     task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
+    task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
     task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this);
-
+    task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this);
     return FTSMTransitions::INITIALISED;
 }
 
@@ -69,9 +70,11 @@ std::string TaskExecutor::ready()
             received_task = true;
 
             ROS_INFO_STREAM("Starting new task: " << new_task->task_id);
+            task_status.status_code = ropod_ros_msgs::Status::ONGOING;
             state = DISPATCHING_ACTION;
             current_action_index = 0;
             current_action_id = "";
+            last_action = false;
             return FTSMTransitions::RUN;
         }
         return FTSMTransitions::WAIT;
@@ -85,10 +88,18 @@ std::string TaskExecutor::running()
         if (current_action_index >= current_task->robot_actions.size())
         {
             state = TASK_DONE;
+            task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
             return FTSMTransitions::WAIT;
         }
+
+        if (current_action_index == current_task->robot_actions.size())
+        {
+            last_action = true;
+        }
+
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
+        task_status.status_code = ropod_ros_msgs::Status::ONGOING;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
@@ -98,16 +109,14 @@ std::string TaskExecutor::running()
         }
         else if (action.type == "DOCK")
         {
-            ROS_WARN_STREAM("DOCK action currently unsupported");
-            current_action_index++;
-            current_action_id = "";
+            action_dock_pub.publish(action);
+            current_action_type = DOCK;
             return FTSMTransitions::WAIT;
         }
         else if (action.type == "UNDOCK")
         {
-            ROS_WARN_STREAM("UNDOCK action currently unsupported");
-            current_action_index++;
-            current_action_id = "";
+            action_undock_pub.publish(action);
+            current_action_type = UNDOCK;
             return FTSMTransitions::WAIT;
         }
         else if (action.type == "REQUEST_ELEVATOR")
@@ -128,6 +137,7 @@ std::string TaskExecutor::running()
             ROS_ERROR_STREAM("Got invalid action: " << action.type);
             ROS_ERROR_STREAM("Stopping task execution");
             action_ongoing = false;
+            task_status.status_code = ropod_ros_msgs::Status::FAILED;
             state = INIT;
             return FTSMTransitions::DONE;
         }
@@ -172,6 +182,7 @@ std::string TaskExecutor::running()
 
                     current_action_type = GOTO_ELEVATOR;
                     state = EXECUTING_ACTION;
+                    task_status.status_code = ropod_ros_msgs::Status::ONGOING;
                     action_ongoing = true;
                 }
             }
@@ -242,9 +253,18 @@ void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestRe
 void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
+    if (last_action)
+    {
+        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
     task_progress_goto_pub.publish(*msg);
 
-    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED  &&
+    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED &&
         msg->sequenceNumber == msg->totalNumber &&
         msg->action_id == current_action_id)
     {
@@ -299,6 +319,32 @@ void TaskExecutor::removeTask(const std::string &task_id)
     mongocxx::client client(mongocxx::uri{});
     auto coll = client[db_name][collection_name];
     coll.delete_one(document{} << "task_id" << task_id << finalize);
+}
+
+void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+{
+    msg->task_id = current_task->task_id;
+    if (last_action)
+    {
+        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
+    task_progress_dock_pub.publish(*msg);
+
+    if (msg->status.status_code == ropod_ros_msgs::Status::DOCKED &&
+        msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
+    else if (msg->status.status_code == ropod_ros_msgs::Status::UNDOCKED &&
+             msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
 }
 
 

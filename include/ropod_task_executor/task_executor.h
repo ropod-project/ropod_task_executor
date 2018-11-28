@@ -4,11 +4,12 @@
 #include <ros/ros.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
+#include <ropod_ros_msgs/TaskProgressDOCK.h>
+#include <ropod_ros_msgs/Status.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/Waypoint.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
-#include <ropod_ros_msgs/ropod_demo_plan.h>
 
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
@@ -58,6 +59,16 @@ private:
     State state;
 
     /**
+     * Current task status
+     */
+    ropod_ros_msgs::Status task_status;
+
+    /**
+     * Flag indicating whether the current action is the last action in the task
+     */
+    bool last_action;
+
+    /**
      * ros private node handle
      */
     ros::NodeHandle nh;
@@ -76,6 +87,11 @@ private:
      * Subscriber for TaskProgressGOTO messages (from navigation)
      */
     ros::Subscriber task_progress_goto_sub;
+
+    /**
+     * Subscriber for TaskProgressDOCK messages (from navigation)
+     */
+    ros::Subscriber task_progress_dock_sub;
 
     /**
      * Publisher for task and action feedback
@@ -106,6 +122,11 @@ private:
      * Publisher for sending TaskProgressGOTO messages (to com mediator)
      */
     ros::Publisher task_progress_goto_pub;
+
+    /**
+     * Publisher for sending TaskProgressDOCK messages (to com mediator)
+     */
+    ros::Publisher task_progress_dock_pub;
 
     /**
      * Reply to elevator request
@@ -177,6 +198,11 @@ private:
      * Subscriber callback for task progress messages for GOTO actions
      */
     void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+
+    /**
+     * Subscriber callback for task progress messages for DOCK actions
+     */
+    void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
 
 
     /**
