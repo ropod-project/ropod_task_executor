@@ -15,6 +15,7 @@ find_package(catkin REQUIRED
     message_generation
     roscpp
     ropod_ros_msgs
+    actionlib
 )
 
 include_directories(

@@ -2,10 +2,14 @@
 #define ACTION_RECOVERY_H
 
 #include <map>
+#include <tuple>
+#include <vector>
 #include <ros/ros.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
+#include <actionlib/client/simple_action_client.h>
+#include <ropod_ros_msgs/GetPathPlanAction.h>
 
 class ActionRecovery
 {
@@ -24,18 +28,23 @@ private:
         double last_recover_time; // last time (unix timestamp) a recovery action was called for this action
     };
 
-    bool recoverGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
+    bool retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
+    bool reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
+
+    std::vector<std::tuple<std::string, std::string, std::string>> getSubAreaSequence(const ropod_ros_msgs::Action &action);
 
     // index of actions for whom recovery has been initiated
     // key: action_id, value: RecoveryState
     std::map<std::string, RecoveryState> recovery_index;
-    // index of areas for whom recovery has been initiated
-    // key: area_id, value: RecoveryState
+    // index of subareas for whom recovery has been initiated
+    // key: sub_area_id, value: RecoveryState
     std::map<std::string, RecoveryState> goto_recovery_index;
 
     ropod_ros_msgs::Task::Ptr current_task;
     int current_action_index;
     int MAX_RETRIES;
+
+    actionlib::SimpleActionClient<ropod_ros_msgs::GetPathPlanAction> path_planner_client;
 
 public:
     ActionRecovery();
