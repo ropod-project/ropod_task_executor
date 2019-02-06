@@ -3,31 +3,17 @@
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 
 ros::Publisher task_progress_pub;
 ros::Publisher elevator_reply_pub;
-double wait_time = 0.5;
-bool with_failed_actions = false;
+bool ask_for_failure = true;
 
 void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
 {
     int num_areas = msg->areas.size();
     ROS_INFO_STREAM("Received action: " << msg->action_id << " with " << num_areas << " areas");
     ropod_ros_msgs::TaskProgressGOTO out_msg;
-    int area_to_fail = 0;
-    bool is_action_failed = true;
-    if (with_failed_actions)
-    {
-        int fail = rand() % 3;
-        if (fail != 0)
-        {
-            is_action_failed = true;
-        }
-        area_to_fail = rand() % num_areas;
-    }
-    ROS_INFO_STREAM("Is action failed: " << is_action_failed << " area to fail: " << area_to_fail);
-    bool failed = false;
     int num_waypoints = 0;
     for (int i = 0; i < num_areas; i++)
     {
@@ -36,7 +22,9 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
             num_waypoints++;
         }
     }
+
     int sequenceNumber = 0;
+    bool failed = false;
     for (int i = 0; i < num_areas; i++)
     {
         for (int j = 0; j < msg->areas[i].sub_areas.size(); j++)
@@ -50,17 +38,26 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
             out_msg.status.status_code = ropod_ros_msgs::Status::REACHED;
             out_msg.subarea_id = msg->areas[i].sub_areas[j].id;
             out_msg.subarea_name = msg->areas[i].sub_areas[j].name;
-            //if (is_action_failed && i == area_to_fail)
-            if (msg->areas[i].sub_areas[j].id == "66")
+            if (ask_for_failure)
             {
-                out_msg.status.status_code = ropod_ros_msgs::Status::FAILED;
-                failed = true;
-                ROS_INFO_STREAM("sub area failed: " << out_msg.subarea_name);
+                ROS_INFO_STREAM("Action type: GOTO, Area: " << out_msg.area_name << " Subarea: " << out_msg.subarea_name << " (" << out_msg.subarea_id << ")");
+                ROS_INFO_STREAM("Success? (y/n, or Y to succeed remaining)");
+                char c;
+                std::cin >> c;
+                if (c != 'y' && c != 'Y')
+                {
+                    out_msg.status.status_code = ropod_ros_msgs::Status::FAILED;
+                    failed = true;
+                    ROS_INFO_STREAM("sub area failed: " << out_msg.subarea_name);
+                }
+                if (c == 'Y')
+                {
+                    ask_for_failure = false;
+                }
             }
             out_msg.sequenceNumber = sequenceNumber;
             out_msg.totalNumber = num_waypoints;
             task_progress_pub.publish(out_msg);
-            ros::Duration(wait_time).sleep();
             if (failed)
             {
                 break;
@@ -88,8 +85,6 @@ int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "execution_mockup");
     ros::NodeHandle nh("~");
-    nh.param<double>("wait_time", wait_time, 0.5);
-    nh.param<bool>("with_failed_actions", with_failed_actions, false);
     ros::Subscriber sub1 = nh.subscribe("GOTO", 1, GOTOCallback);
     ros::Subscriber sub2 = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
     task_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto", 1);

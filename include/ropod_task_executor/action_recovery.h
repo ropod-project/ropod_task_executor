@@ -31,6 +31,9 @@ private:
     bool retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
     bool reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
 
+    /**
+     * Returns a flatted list of (area, subarea, subarea id) tuples in the action
+     */
     std::vector<std::tuple<std::string, std::string, std::string>> getSubAreaSequence(const ropod_ros_msgs::Action &action);
 
     // index of actions for whom recovery has been initiated
