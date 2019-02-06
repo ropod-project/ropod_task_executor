@@ -3,7 +3,7 @@
 ActionRecovery::ActionRecovery() : path_planner_client("/get_path_plan")
 {
     // TODO: make this configurable
-    MAX_RETRIES = 1;
+    MAX_RETRIES = 3;
 }
 
 ActionRecovery::~ActionRecovery()

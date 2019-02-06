@@ -156,6 +156,11 @@ private:
     bool action_ongoing;
 
     /**
+     * Flag indicating whether an action within the task failed
+     */
+    bool action_failed;
+
+    /**
      * Index of current action being executed
      */
     int current_action_index;
@@ -189,6 +194,11 @@ private:
      * Action recovery object
      */
     ActionRecovery action_recovery;
+
+    /**
+     * Last progress message
+     */
+    ropod_ros_msgs::TaskProgressGOTO::Ptr goto_progress_msg;
 
     /**
      * callback for reply to elevator request
@@ -238,7 +248,7 @@ private:
     void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
     void setCurrentActionIndex(int index);
 
-    void retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+    bool retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
 
 public:
     TaskExecutor();
