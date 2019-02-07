@@ -5,6 +5,7 @@
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
 #include <ropod_ros_msgs/TaskProgressDOCK.h>
+#include <ropod_ros_msgs/TaskProgressELEVATOR.h>
 #include <ropod_ros_msgs/Status.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/Waypoint.h>
@@ -95,6 +96,11 @@ private:
     ros::Subscriber task_progress_dock_sub;
 
     /**
+     * Subscriber for TaskProgressELEVATOR messages (from navigation)
+     */
+    ros::Subscriber task_progress_elevator_sub;
+
+    /**
      * Publisher for task and action feedback
      */
     ros::Publisher task_feedback_pub;
@@ -115,6 +121,16 @@ private:
     ros::Publisher action_undock_pub;
 
     /**
+     * Publisher for sending enter elevator actions
+     */
+    ros::Publisher action_enter_elevator_pub;
+
+    /**
+     * Publisher for sending exit elevator actions
+     */
+    ros::Publisher action_exit_elevator_pub;
+
+    /**
      * Publisher for sending elevator requests
      */
     ros::Publisher elevator_request_pub;
@@ -128,6 +144,11 @@ private:
      * Publisher for sending TaskProgressDOCK messages (to com mediator)
      */
     ros::Publisher task_progress_dock_pub;
+
+    /**
+     * Publisher for sending TaskProgressELEVATOR messages (to com mediator)
+     */
+    ros::Publisher task_progress_elevator_pub;
 
     /**
      * Reply to elevator request
@@ -220,6 +241,10 @@ private:
      */
     void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
 
+    /**
+     * Subscriber callback for task progress messages for DOCK actions
+     */
+    void taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg);
 
     /**
      * Publish a message to request an elevator

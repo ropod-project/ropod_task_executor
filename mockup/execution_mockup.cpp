@@ -1,11 +1,13 @@
 #include <ros/ros.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
+#include <ropod_ros_msgs/TaskProgressELEVATOR.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
 #include <stdlib.h>
 
 ros::Publisher task_progress_pub;
+ros::Publisher elevator_progress_pub;
 ros::Publisher elevator_reply_pub;
 bool ask_for_failure = true;
 
@@ -70,6 +72,26 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
     }
 }
 
+void elevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg->action_id;
+    out_msg.action_type = msg->type;
+    out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::WAITING;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::ENTERING;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::REACHED;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+}
+
 void elevatorRequestCallback(const ropod_ros_msgs::ElevatorRequest::Ptr &msg)
 {
     // publish reply
@@ -86,8 +108,10 @@ int main(int argc, char *argv[])
     ros::init(argc, argv, "execution_mockup");
     ros::NodeHandle nh("~");
     ros::Subscriber sub1 = nh.subscribe("GOTO", 1, GOTOCallback);
-    ros::Subscriber sub2 = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
+    ros::Subscriber sub2 = nh.subscribe("ELEVATOR", 1, elevatorCallback);
+    ros::Subscriber sub3 = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
     task_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto", 1);
+    elevator_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator", 1);
     elevator_reply_pub = nh.advertise<ropod_ros_msgs::ElevatorRequestReply>("elevator_reply", 1);
     ros::spin();
     return 0;
