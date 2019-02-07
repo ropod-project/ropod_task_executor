@@ -242,7 +242,7 @@ private:
     void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
 
     /**
-     * Subscriber callback for task progress messages for DOCK actions
+     * Subscriber callback for task progress messages for ENTER_ELEVATOR and EXIT_ELEVATOR actions
      */
     void taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg);
 
