@@ -16,6 +16,7 @@ TaskExecutor::TaskExecutor() :
     nh("~"),
     received_task(false),
     action_ongoing(false),
+    action_failed(false),
     current_action_index(-1)
 {
 }
@@ -56,7 +57,7 @@ std::string TaskExecutor::ready()
     {
         ROS_INFO_STREAM("Received new task");
         state = DISPATCHING_ACTION;
-        current_action_index = 0;
+        setCurrentActionIndex(0);
         current_action_id = "";
         return FTSMTransitions::RUN;
     }
@@ -66,13 +67,13 @@ std::string TaskExecutor::ready()
         bool task_exists = getNextTask(new_task);
         if (task_exists)
         {
-            current_task = new_task;
+            setCurrentTask(new_task);
             received_task = true;
 
             ROS_INFO_STREAM("Starting new task: " << new_task->task_id);
             task_status.status_code = ropod_ros_msgs::Status::ONGOING;
             state = DISPATCHING_ACTION;
-            current_action_index = 0;
+            setCurrentActionIndex(0);
             current_action_id = "";
             last_action = false;
             return FTSMTransitions::RUN;
@@ -99,6 +100,7 @@ std::string TaskExecutor::running()
 
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
+        action_failed = false;
         task_status.status_code = ropod_ros_msgs::Status::ONGOING;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
@@ -128,7 +130,7 @@ std::string TaskExecutor::running()
         else if (action.type == "ENTER_ELEVATOR")
         {
             ROS_WARN_STREAM("ENTER_ELEVATOR action currently unsupported");
-            current_action_index++;
+            setCurrentActionIndex(current_action_index+1);
             current_action_id = "";
             return FTSMTransitions::CONTINUE;
         }
@@ -148,11 +150,16 @@ std::string TaskExecutor::running()
     {
         if (!action_ongoing)
         {
-            current_action_index++;
+            setCurrentActionIndex(current_action_index+1);
             current_action_id = "";
             state = DISPATCHING_ACTION;
             return FTSMTransitions::CONTINUE;
         }
+        if (action_failed)
+        {
+            return FTSMTransitions::RECOVER;
+        }
+
         if (current_action_type == REQUEST_ELEVATOR)
         {
             if (elevator_reply)
@@ -192,11 +199,13 @@ std::string TaskExecutor::running()
     else if (state == TASK_DONE)
     {
         received_task = false;
-        current_action_index = -1;
+        setCurrentActionIndex(-1);
         current_action_id = "";
         action_ongoing = false;
+        action_failed = false;
         state = INIT;
         std::cout << "Task done! " << std::endl;
+        action_recovery.setTaskDone();
         removeTask(current_task->task_id);
         return FTSMTransitions::DONE;
     }
@@ -204,7 +213,16 @@ std::string TaskExecutor::running()
 
 std::string TaskExecutor::recovering()
 {
-    return FTSMTransitions::DONE_RECOVERING;
+    bool success = retryFailedAction(goto_progress_msg);
+    if (success)
+    {
+        action_failed = false;
+        return FTSMTransitions::DONE_RECOVERING;
+    }
+    else
+    {
+        return FTSMTransitions::FAILED_RECOVERY;
+    }
 }
 
 void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const std::string &task_id, const std::string &cart_type)
@@ -240,7 +258,7 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     else
     {
         queueTask(msg, "active");
-        current_task = msg;
+        setCurrentTask(msg);
         received_task = true;
     }
 }
@@ -253,13 +271,20 @@ void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestRe
 void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
+    if (msg->status.status_code == ropod_ros_msgs::Status::FAILED)
+    {
+        ROS_ERROR_STREAM("Action failed: " << msg->action_id  << " at area: " << msg->area_name);
+        goto_progress_msg = msg;
+        action_failed = true;
+        return;
+    }
     if (last_action)
     {
         msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
     }
     else
     {
-        msg ->task_status.status_code = task_status.status_code;
+        msg->task_status.status_code = task_status.status_code;
     }
 
     task_progress_goto_pub.publish(*msg);
@@ -347,6 +372,28 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
     }
 }
 
+bool TaskExecutor::retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
+{
+    ropod_ros_msgs::Action recovery_action;
+    bool success = action_recovery.recover(msg, recovery_action);
+    if (success)
+    {
+        action_goto_pub.publish(recovery_action);
+    }
+    return success;
+}
+
+void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
+{
+    current_task = msg;
+    action_recovery.setCurrentTask(msg);
+}
+
+void TaskExecutor::setCurrentActionIndex(int index)
+{
+    current_action_index = index;
+    action_recovery.setCurrentActionIndex(current_action_index);
+}
 
 int main(int argc, char **argv)
 {
@@ -359,7 +406,6 @@ int main(int argc, char **argv)
     while (ros::ok())
     {
         ros::spinOnce();
-        //std::cout << "finished running" << std::endl;
         loop_rate.sleep();
     }
 

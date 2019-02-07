@@ -15,6 +15,7 @@ find_package(catkin REQUIRED
     message_generation
     roscpp
     ropod_ros_msgs
+    actionlib
 )
 
 include_directories(
@@ -39,6 +40,7 @@ catkin_package(
 
 add_executable(ropod_task_executor
     src/task_executor.cpp
+    src/action_recovery.cpp
     /opt/ropod/ropod_common/ropodcpp/ftsm/src/ftsm_base.cpp
     /opt/ropod/ftsm/cppftsm/src/ftsm.cpp
 )

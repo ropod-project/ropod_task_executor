@@ -15,6 +15,7 @@
 #include <mongocxx/instance.hpp>
 
 #include <ftsm_base.h>
+#include <ropod_task_executor/action_recovery.h>
 
 
 using namespace ftsm;
@@ -155,6 +156,11 @@ private:
     bool action_ongoing;
 
     /**
+     * Flag indicating whether an action within the task failed
+     */
+    bool action_failed;
+
+    /**
      * Index of current action being executed
      */
     int current_action_index;
@@ -183,6 +189,16 @@ private:
      * Mongodb instance
      */
     mongocxx::instance mongo_instance;
+
+    /**
+     * Action recovery object
+     */
+    ActionRecovery action_recovery;
+
+    /**
+     * Last progress message
+     */
+    ropod_ros_msgs::TaskProgressGOTO::Ptr goto_progress_msg;
 
     /**
      * callback for reply to elevator request
@@ -228,6 +244,11 @@ private:
      * Remove a task from the queue
      */
     void removeTask(const std::string &task_id);
+
+    void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
+    void setCurrentActionIndex(int index);
+
+    bool retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
 
 public:
     TaskExecutor();
