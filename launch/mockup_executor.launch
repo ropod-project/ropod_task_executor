@@ -1,13 +1,11 @@
 <?xml version="1.0"?>
 <launch>
-    <arg name="wait_time" default="0.5" />
-    <arg name="with_failed_actions" default="false" />
     <node pkg="ropod_task_executor" type="execution_mockup" name="execution_mockup" output="screen">
         <remap from="~GOTO" to="/ropod_task_executor/GOTO" />
+        <remap from="~ELEVATOR" to="/ropod_task_executor/ENTER_ELEVATOR" />
         <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
         <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
         <remap from="~progress_goto" to="/task_progress/goto" />
-        <param name="wait_time" value="$(arg wait_time)" type="double" />
-        <param name="with_failed_actions" value="$(arg with_failed_actions)" type="bool" />
+        <remap from="~progress_elevator" to="/task_progress/elevator" />
     </node>
 </launch>
