@@ -4,11 +4,7 @@
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc
 #include <ros/serialization.h>
 #include <bsoncxx/types.hpp>
-
-using bsoncxx::builder::stream::document;
-using bsoncxx::builder::stream::open_document;
-using bsoncxx::builder::stream::close_document;
-using bsoncxx::builder::stream::finalize;
+#include <bsoncxx/builder/stream/document.hpp>
 
 TaskExecutor::TaskExecutor() :
     FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator"}),
@@ -360,8 +356,9 @@ bool TaskExecutor::getNextTask(ropod_ros_msgs::Task::Ptr &task)
         ros::serialization::Serializer<ropod_ros_msgs::Task>::read(stream, *task);
 
         // set status of task to active
-        coll.update_one(document{} << "task_id" << task_id << finalize,
-                        document{} << "$set" << open_document << "task_status" << "active" << close_document << finalize);
+        coll.update_one(bsoncxx::builder::stream::document{} << "task_id" << task_id << bsoncxx::builder::stream::finalize,
+                        bsoncxx::builder::stream::document{} << "$set" << bsoncxx::builder::stream::open_document 
+                        << "task_status" << "active" << bsoncxx::builder::stream::close_document << bsoncxx::builder::stream::finalize);
         return true;
     }
     return false;
@@ -371,7 +368,7 @@ void TaskExecutor::removeTask(const std::string &task_id)
 {
     mongocxx::client client(mongocxx::uri{});
     auto coll = client[db_name][collection_name];
-    coll.delete_one(document{} << "task_id" << task_id << finalize);
+    coll.delete_one(bsoncxx::builder::stream::document{} << "task_id" << task_id << bsoncxx::builder::stream::finalize);
 }
 
 void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
