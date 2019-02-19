@@ -99,7 +99,7 @@ void elevatorRequestCallback(const ropod_ros_msgs::ElevatorRequest::Ptr &msg)
     out_msg.query_id = msg->query_id;
     out_msg.query_success = true;
     out_msg.elevator_id = 0;
-    out_msg.elevator_waypoint = "none";
+    out_msg.elevator_door_id = 0;
     elevator_reply_pub.publish(out_msg);
 }
 

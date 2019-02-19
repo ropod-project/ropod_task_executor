@@ -39,7 +39,8 @@ private:
         DOCK,
         UNDOCK,
         REQUEST_ELEVATOR,
-        GOTO_ELEVATOR,
+        WAIT_FOR_ELEVATOR,
+        RIDE_ELEVATOR,
         ENTER_ELEVATOR,
         EXIT_ELEVATOR
     };
@@ -258,7 +259,7 @@ private:
     /**
      * Queue a new task
      */
-    void queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status); 
+    void queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status);
 
     /**
      * Check and get next task from queue
