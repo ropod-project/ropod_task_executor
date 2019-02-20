@@ -122,9 +122,19 @@ private:
     ros::Publisher action_undock_pub;
 
     /**
+     * Publisher for elevator waiting actions
+     */
+    ros::Publisher action_wait_for_elevator_pub;
+
+    /**
      * Publisher for sending enter elevator actions
      */
     ros::Publisher action_enter_elevator_pub;
+
+    /**
+     * Publisher for elevator riding actions
+     */
+    ros::Publisher action_ride_elevator_pub;
 
     /**
      * Publisher for sending exit elevator actions

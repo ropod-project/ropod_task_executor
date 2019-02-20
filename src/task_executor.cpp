@@ -31,7 +31,9 @@ std::string TaskExecutor::init()
     action_goto_pub = nh.advertise<ropod_ros_msgs::Action>("GOTO", 1);
     action_dock_pub = nh.advertise<ropod_ros_msgs::Action>("DOCK", 1);
     action_undock_pub = nh.advertise<ropod_ros_msgs::Action>("UNDOCK", 1);
+    action_wait_for_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("WAIT_FOR_ELEVATOR", 1);
     action_enter_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("ENTER_ELEVATOR", 1);
+    action_ride_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("RIDE_ELEVATOR", 1);
     action_exit_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("EXIT_ELEVATOR", 1);
 
     elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
@@ -131,12 +133,12 @@ std::string TaskExecutor::running()
         {
             action.elevator.elevator_id = elevator_reply->elevator_id;
             action.elevator.door_id = elevator_reply->elevator_door_id;
-            action_enter_elevator_pub.publish(action);
+            action_wait_for_elevator_pub.publish(action);
             current_action_type = WAIT_FOR_ELEVATOR;
         }
         else if (action.type == "RIDE_ELEVATOR")
         {
-            action_enter_elevator_pub.publish(action);
+            action_ride_elevator_pub.publish(action);
             current_action_type = RIDE_ELEVATOR;
         }
         else if (action.type == "ENTER_ELEVATOR")
