@@ -31,7 +31,9 @@ std::string TaskExecutor::init()
     action_goto_pub = nh.advertise<ropod_ros_msgs::Action>("GOTO", 1);
     action_dock_pub = nh.advertise<ropod_ros_msgs::Action>("DOCK", 1);
     action_undock_pub = nh.advertise<ropod_ros_msgs::Action>("UNDOCK", 1);
+    action_wait_for_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("WAIT_FOR_ELEVATOR", 1);
     action_enter_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("ENTER_ELEVATOR", 1);
+    action_ride_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("RIDE_ELEVATOR", 1);
     action_exit_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("EXIT_ELEVATOR", 1);
 
     elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
@@ -127,6 +129,18 @@ std::string TaskExecutor::running()
             elevator_reply = nullptr;
             requestElevator(action, current_task->task_id, current_task->cart_type);
         }
+        else if (action.type == "WAIT_FOR_ELEVATOR")
+        {
+            action.elevator.elevator_id = elevator_reply->elevator_id;
+            action.elevator.door_id = elevator_reply->elevator_door_id;
+            action_wait_for_elevator_pub.publish(action);
+            current_action_type = WAIT_FOR_ELEVATOR;
+        }
+        else if (action.type == "RIDE_ELEVATOR")
+        {
+            action_ride_elevator_pub.publish(action);
+            current_action_type = RIDE_ELEVATOR;
+        }
         else if (action.type == "ENTER_ELEVATOR")
         {
             action_enter_elevator_pub.publish(action);
@@ -171,29 +185,8 @@ std::string TaskExecutor::running()
                 std::cout << "Expected query id: " << current_elevator_query_id << " received query id: " << elevator_reply->query_id << std::endl;
                 if (elevator_reply->query_success && current_elevator_query_id == elevator_reply->query_id)
                 {
-                    current_elevator_query_id = "";
-                    std::string wp = elevator_reply->elevator_waypoint;
-
-                    ropod_ros_msgs::Action goto_action;
-
-                    boost::uuids::uuid uuid = boost::uuids::random_generator()();
-                    std::stringstream ss;
-                    ss << uuid;
-                    goto_action.action_id = ss.str();
-
-                    goto_action.type = "GOTO";
-                    ropod_ros_msgs::Area area;
-                    area.name = wp;
-                    goto_action.areas.push_back(area);
-
-                    ROS_INFO_STREAM("Dispatching action to elevator waypoint: " << elevator_reply->elevator_waypoint);
-                    action_goto_pub.publish(goto_action);
-                    elevator_reply = nullptr;
-
-                    current_action_type = GOTO_ELEVATOR;
-                    state = EXECUTING_ACTION;
-                    task_status.status_code = ropod_ros_msgs::Status::ONGOING;
-                    action_ongoing = true;
+                    ROS_INFO("Received elevator %d and door %d", elevator_reply->elevator_id, elevator_reply->elevator_door_id);
+                    action_ongoing = false;
                 }
             }
         }
@@ -357,7 +350,7 @@ bool TaskExecutor::getNextTask(ropod_ros_msgs::Task::Ptr &task)
 
         // set status of task to active
         coll.update_one(bsoncxx::builder::stream::document{} << "task_id" << task_id << bsoncxx::builder::stream::finalize,
-                        bsoncxx::builder::stream::document{} << "$set" << bsoncxx::builder::stream::open_document 
+                        bsoncxx::builder::stream::document{} << "$set" << bsoncxx::builder::stream::open_document
                         << "task_status" << "active" << bsoncxx::builder::stream::close_document << bsoncxx::builder::stream::finalize);
         return true;
     }

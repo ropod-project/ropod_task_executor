@@ -39,7 +39,8 @@ private:
         DOCK,
         UNDOCK,
         REQUEST_ELEVATOR,
-        GOTO_ELEVATOR,
+        WAIT_FOR_ELEVATOR,
+        RIDE_ELEVATOR,
         ENTER_ELEVATOR,
         EXIT_ELEVATOR
     };
@@ -121,9 +122,19 @@ private:
     ros::Publisher action_undock_pub;
 
     /**
+     * Publisher for elevator waiting actions
+     */
+    ros::Publisher action_wait_for_elevator_pub;
+
+    /**
      * Publisher for sending enter elevator actions
      */
     ros::Publisher action_enter_elevator_pub;
+
+    /**
+     * Publisher for elevator riding actions
+     */
+    ros::Publisher action_ride_elevator_pub;
 
     /**
      * Publisher for sending exit elevator actions
@@ -258,7 +269,7 @@ private:
     /**
      * Queue a new task
      */
-    void queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status); 
+    void queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status);
 
     /**
      * Check and get next task from queue
