@@ -115,19 +115,17 @@ std::string TaskExecutor::running()
         {
             action_dock_pub.publish(action);
             current_action_type = DOCK;
-            return FTSMTransitions::WAIT;
         }
         else if (action.type == "UNDOCK")
         {
             action_undock_pub.publish(action);
             current_action_type = UNDOCK;
-            return FTSMTransitions::WAIT;
         }
         else if (action.type == "REQUEST_ELEVATOR")
         {
             current_action_type = REQUEST_ELEVATOR;
             elevator_reply = nullptr;
-            requestElevator(action, current_task->task_id, current_task->cart_type);
+            requestElevator(action, current_task->task_id, current_task->load_type);
         }
         else if (action.type == "WAIT_FOR_ELEVATOR")
         {
