@@ -104,17 +104,19 @@ bool ActionRecovery::retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr
     // find the area where GOTO action failed
     for (int i = 0; i < recovery_action.areas.size(); i++)
     {
-        if (recovery_action.areas[i].name == msg->area_name)
+        failed_area_index = i;
+        bool found = false;
+        for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
         {
-            failed_area_index = i;
-            for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
+            if (recovery_action.areas[i].sub_areas[j].name == msg->subarea_name)
             {
-                if (recovery_action.areas[i].sub_areas[j].name == msg->subarea_name)
-                {
-                    failed_subarea_index = j;
-                    break;
-                }
+                failed_subarea_index = j;
+                found = true;
+                break;
             }
+        }
+        if (found)
+        {
             break;
         }
     }
@@ -161,24 +163,22 @@ bool ActionRecovery::reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOT
     // find the area where GOTO action failed
     for (int i = 0; i < recovery_action.areas.size(); i++)
     {
-        if (recovery_action.areas[i].name == msg->area_name)
+        failed_area_index = i;
+        bool found = false;
+        for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
         {
-            failed_area_index = i;
-            for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
+            if (recovery_action.areas[i].sub_areas[j].name == msg->subarea_name)
             {
-                if (recovery_action.areas[i].sub_areas[j].name == msg->subarea_name)
-                {
-                    failed_subarea_index = j;
-                    flat_failed_subarea_index = flat_index;
-                    break;
-                }
-                flat_index++;
+                failed_subarea_index = j;
+                flat_failed_subarea_index = flat_index;
+                found = true;
+                break;
             }
-            break;
+            flat_index++;
         }
-        else
+        if (found)
         {
-            flat_index += recovery_action.areas[i].sub_areas.size();
+            break;
         }
     }
 
