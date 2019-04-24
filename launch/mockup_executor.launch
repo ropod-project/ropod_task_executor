@@ -2,10 +2,13 @@
 <launch>
     <node pkg="ropod_task_executor" type="execution_mockup" name="execution_mockup" output="screen">
         <remap from="~GOTO" to="/ropod_task_executor/GOTO" />
+        <remap from="~DOCK" to="/ropod_task_executor/DOCK" />
+        <remap from="~UNDOCK" to="/ropod_task_executor/UNDOCK" />
         <remap from="~ELEVATOR" to="/ropod_task_executor/ENTER_ELEVATOR" />
         <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
         <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
         <remap from="~progress_goto" to="/task_progress/goto" />
         <remap from="~progress_elevator" to="/task_progress/elevator" />
+        <remap from="~progress_dock" to="/task_progress/dock" />
     </node>
 </launch>

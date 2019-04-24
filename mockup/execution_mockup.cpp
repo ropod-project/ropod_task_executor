@@ -1,16 +1,39 @@
 #include <ros/ros.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
+#include <ropod_ros_msgs/TaskProgressDOCK.h>
 #include <ropod_ros_msgs/TaskProgressELEVATOR.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
 #include <stdlib.h>
 
-ros::Publisher task_progress_pub;
+ros::Publisher goto_progress_pub;
+ros::Publisher dock_progress_pub;
 ros::Publisher elevator_progress_pub;
 ros::Publisher elevator_reply_pub;
 bool ask_for_failure = true;
 
+void DOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
+{
+    ROS_INFO_STREAM("Received action: " << msg->action_id << " of type " << msg->type);
+    ropod_ros_msgs::TaskProgressDOCK out_msg;
+    out_msg.action_id = msg->action_id;
+    out_msg.action_type = msg->type;
+    out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
+    out_msg.status.status_code = ropod_ros_msgs::Status::DOCKED;
+    dock_progress_pub.publish(out_msg);
+}
+
+void UNDOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
+{
+    ROS_INFO_STREAM("Received action: " << msg->action_id << " of type " << msg->type);
+    ropod_ros_msgs::TaskProgressDOCK out_msg;
+    out_msg.action_id = msg->action_id;
+    out_msg.action_type = msg->type;
+    out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
+    out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKED;
+    dock_progress_pub.publish(out_msg);
+}
 void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
 {
     int num_areas = msg->areas.size();
@@ -59,7 +82,7 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
             }
             out_msg.sequenceNumber = sequenceNumber;
             out_msg.totalNumber = num_waypoints;
-            task_progress_pub.publish(out_msg);
+            goto_progress_pub.publish(out_msg);
             if (failed)
             {
                 break;
@@ -99,7 +122,7 @@ void elevatorRequestCallback(const ropod_ros_msgs::ElevatorRequest::Ptr &msg)
     out_msg.query_id = msg->query_id;
     out_msg.query_success = true;
     out_msg.elevator_id = 0;
-    out_msg.elevator_door_id = 0;
+    out_msg.elevator_door_id = 1;
     elevator_reply_pub.publish(out_msg);
 }
 
@@ -110,7 +133,10 @@ int main(int argc, char *argv[])
     ros::Subscriber sub1 = nh.subscribe("GOTO", 1, GOTOCallback);
     ros::Subscriber sub2 = nh.subscribe("ELEVATOR", 1, elevatorCallback);
     ros::Subscriber sub3 = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
-    task_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto", 1);
+    ros::Subscriber sub4 = nh.subscribe("DOCK", 1, DOCKCallback);
+    ros::Subscriber sub5 = nh.subscribe("UNDOCK", 1, UNDOCKCallback);
+    goto_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto", 1);
+    dock_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock", 1);
     elevator_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator", 1);
     elevator_reply_pub = nh.advertise<ropod_ros_msgs::ElevatorRequestReply>("elevator_reply", 1);
     ros::spin();
