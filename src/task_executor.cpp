@@ -7,7 +7,10 @@
 #include <bsoncxx/builder/stream/document.hpp>
 
 TaskExecutor::TaskExecutor() :
-    FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator"}),
+    FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator"},
+             {{"roscore", {{"functional", "ros/ros_master_monitor"}}},
+              {"com_mediator", {{"functional", "ros/ros_node_monitor"}}},
+              {"route_navigation", {{"functional", "ros/ros_node_monitor"}}}}),
     state(INIT),
     nh("~"),
     received_task(false),
