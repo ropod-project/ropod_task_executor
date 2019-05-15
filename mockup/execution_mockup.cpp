@@ -115,7 +115,7 @@ void elevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
-    out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_REACHED;
+    out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 }

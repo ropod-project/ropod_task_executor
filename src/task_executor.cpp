@@ -313,7 +313,7 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
     task_progress_elevator_pub.publish(*msg);
 
     if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_REACHED &&
+    	msg->status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
         msg->action_id == current_action_id)
     {
         action_ongoing = false;
