@@ -45,6 +45,9 @@ std::string TaskExecutor::init()
     task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this);
     task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this);
     task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this);
+
+    task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+
     return FTSMTransitions::INITIALISED;
 }
 
@@ -73,7 +76,7 @@ std::string TaskExecutor::ready()
             received_task = true;
 
             ROS_INFO_STREAM("Starting new task: " << new_task->task_id);
-            task_status.status_code = ropod_ros_msgs::Status::ONGOING;
+            task_status.status_code = ropod_ros_msgs::Status::RUNNING;
             state = DISPATCHING_ACTION;
             setCurrentActionIndex(0);
             current_action_id = "";
@@ -91,7 +94,7 @@ std::string TaskExecutor::running()
         if (current_action_index >= current_task->robot_actions.size())
         {
             state = TASK_DONE;
-            task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+            task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
             return FTSMTransitions::WAIT;
         }
 
@@ -103,7 +106,7 @@ std::string TaskExecutor::running()
         current_action_id = current_task->robot_actions[current_action_index].action_id;
         action_ongoing = true;
         action_failed = false;
-        task_status.status_code = ropod_ros_msgs::Status::ONGOING;
+        task_status.status_code = ropod_ros_msgs::Status::RUNNING;
         ropod_ros_msgs::Action action = current_task->robot_actions[current_action_index];
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
@@ -265,7 +268,8 @@ void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestRe
 void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
-    if (msg->status.status_code == ropod_ros_msgs::Status::FAILED)
+    if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
+    		(msg->status.status_code == ropod_ros_msgs::Status::FAILED || msg->status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
     {
         ROS_ERROR_STREAM("Action failed: " << msg->action_id  << " at area: " << msg->area_name);
         goto_progress_msg = msg;
@@ -274,7 +278,8 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
     }
     if (last_action)
     {
-        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+        msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
     }
     else
     {
@@ -283,7 +288,8 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
 
     task_progress_goto_pub.publish(*msg);
 
-    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED &&
+    if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
+    	msg->status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
         msg->sequenceNumber == msg->totalNumber &&
         msg->action_id == current_action_id)
     {
@@ -296,7 +302,8 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
     msg->task_id = current_task->task_id;
     if (last_action)
     {
-        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
     }
     else
     {
@@ -305,7 +312,8 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
 
     task_progress_elevator_pub.publish(*msg);
 
-    if (msg->status.status_code == ropod_ros_msgs::Status::REACHED &&
+    if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
+    	msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_REACHED &&
         msg->action_id == current_action_id)
     {
         action_ongoing = false;
@@ -367,7 +375,8 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
     msg->task_id = current_task->task_id;
     if (last_action)
     {
-        msg->task_status.status_code = ropod_ros_msgs::Status::COMPLETED;
+        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
     }
     else
     {
@@ -376,16 +385,19 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
 
     task_progress_dock_pub.publish(*msg);
 
-    if (msg->status.status_code == ropod_ros_msgs::Status::DOCKED &&
+    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
         msg->action_id == current_action_id)
     {
         action_ongoing = false;
     }
-    else if (msg->status.status_code == ropod_ros_msgs::Status::UNDOCKED &&
+    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
              msg->action_id == current_action_id)
     {
         action_ongoing = false;
     }
+    //TODO we have now more cases
 }
 
 bool TaskExecutor::retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
