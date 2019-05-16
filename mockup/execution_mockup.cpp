@@ -19,8 +19,9 @@ void DOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
     ropod_ros_msgs::TaskProgressDOCK out_msg;
     out_msg.action_id = msg->action_id;
     out_msg.action_type = msg->type;
-    out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
-    out_msg.status.status_code = ropod_ros_msgs::Status::DOCKED;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+    out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
+    out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED;
     dock_progress_pub.publish(out_msg);
 }
 
@@ -30,8 +31,9 @@ void UNDOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
     ropod_ros_msgs::TaskProgressDOCK out_msg;
     out_msg.action_id = msg->action_id;
     out_msg.action_type = msg->type;
-    out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
-    out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKED;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+    out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
+    out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED;
     dock_progress_pub.publish(out_msg);
 }
 void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
@@ -59,8 +61,9 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
             out_msg.action_id = msg->action_id;
             out_msg.action_type = msg->type;
             out_msg.area_name = msg->areas[i].name;
-            out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
-            out_msg.status.status_code = ropod_ros_msgs::Status::REACHED;
+            out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+            out_msg.status.module_code = ropod_ros_msgs::Status::ROUTE_NAVIGATION;
+            out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
             out_msg.subarea_id = msg->areas[i].sub_areas[j].id;
             out_msg.subarea_name = msg->areas[i].sub_areas[j].name;
             if (ask_for_failure)
@@ -72,6 +75,7 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
                 if (c != 'y' && c != 'Y')
                 {
                     out_msg.status.status_code = ropod_ros_msgs::Status::FAILED;
+                    // also sand back GOAL_NOT_REACHABLE ?
                     failed = true;
                     ROS_INFO_STREAM("sub area failed: " << out_msg.subarea_name);
                 }
@@ -100,7 +104,8 @@ void elevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     ropod_ros_msgs::TaskProgressELEVATOR out_msg;
     out_msg.action_id = msg->action_id;
     out_msg.action_type = msg->type;
-    out_msg.status.domain = ropod_ros_msgs::Status::ACTION_FEEDBACK;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
 
     out_msg.status.status_code = ropod_ros_msgs::Status::WAITING;
     elevator_progress_pub.publish(out_msg);
@@ -110,7 +115,7 @@ void elevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
-    out_msg.status.status_code = ropod_ros_msgs::Status::REACHED;
+    out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 }
