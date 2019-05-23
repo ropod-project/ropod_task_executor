@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 2.8.6)
 project(ropod_task_executor)
 
 set(CMAKE_CXX_STANDARD 11)
+include(/opt/ropod/ropod_common/ropodcpp/ftsm/CMakeLists.txt)
 
 find_package(PkgConfig)
 include(FindPkgConfig)
@@ -20,8 +21,6 @@ find_package(catkin REQUIRED
 
 include_directories(
   include
-  /opt/ropod/ftsm/cppftsm/include
-  /opt/ropod/ropod_common/ropodcpp/ftsm/include
   ${LIBMONGOCXX_INCLUDE_DIRS}
   ${LIBBSONCXX_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
@@ -50,6 +49,7 @@ target_link_libraries(ropod_task_executor
   ${LIBMONGOCXX_LIBRARIES}
   ${LIBBSONCXX_LIBRARIES}
   ${catkin_LIBRARIES}
+  ${FTSM_LIBRARIES}
 )
 
 add_executable(execution_mockup

@@ -218,11 +218,6 @@ private:
     std::string collection_name;
 
     /**
-     * Mongodb instance
-     */
-    mongocxx::instance mongo_instance;
-
-    /**
      * Action recovery object
      */
     ActionRecovery action_recovery;
