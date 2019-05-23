@@ -8,9 +8,9 @@
 
 TaskExecutor::TaskExecutor() :
     FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator"},
-             {{"roscore", {{"functional", "ros/ros_master_monitor"}}},
-              {"com_mediator", {{"functional", "ros/ros_node_monitor"}}},
-              {"route_navigation", {{"functional", "ros/ros_node_monitor"}}}}),
+             {{"functional", {{"roscore", "ros/ros_master_monitor"},
+                              {"com_mediator", "ros/ros_node_monitor"},
+                              {"route_navigation", "ros/ros_node_monitor"}}}}),
     state(INIT),
     nh("~"),
     received_task(false),
