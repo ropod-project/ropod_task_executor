@@ -281,6 +281,8 @@ private:
 
     bool retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
 
+    std::string checkDependsStatuses();
+
 public:
     TaskExecutor();
     virtual ~TaskExecutor();

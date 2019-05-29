@@ -51,7 +51,8 @@ std::string TaskExecutor::init()
 
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
 
-    return FTSMTransitions::INITIALISED;
+    std::string transition = checkDependsStatuses();
+    return transition;
 }
 
 std::string TaskExecutor::configuring()
@@ -213,15 +214,89 @@ std::string TaskExecutor::running()
 
 std::string TaskExecutor::recovering()
 {
-    bool success = retryFailedAction(goto_progress_msg);
-    if (success)
+    if (state == EXECUTING_ACTION)
     {
-        action_failed = false;
+        bool success = retryFailedAction(goto_progress_msg);
+        if (success)
+        {
+            action_failed = false;
+            return FTSMTransitions::DONE_RECOVERING;
+        }
+        else
+        {
+            return FTSMTransitions::FAILED_RECOVERY;
+        }
+    }
+    else if (state == INIT)
+    {
+        ROS_WARN_STREAM("Retrying initialization after 2 seconds");
+        ros::Duration(2).sleep();
         return FTSMTransitions::DONE_RECOVERING;
+    }
+}
+
+std::string TaskExecutor::checkDependsStatuses()
+{
+    std::vector<std::string> non_functional_components;
+    for (MonitorIterator mon_iter = this->depend_statuses.begin(); mon_iter != this->depend_statuses.end(); ++mon_iter)
+    {
+        for (ComponentIterator comp_iter = mon_iter->second.begin(); comp_iter != mon_iter->second.end(); ++comp_iter)
+        {
+            for (MonitorSpecIterator mon_spec_iter = comp_iter->second.begin(); mon_spec_iter != comp_iter->second.end(); ++mon_spec_iter)
+            {
+                if (mon_spec_iter->first == "ros/ros_master_monitor")
+                {
+                    auto status = bsoncxx::from_json(mon_spec_iter->second);
+                    try
+                    {
+                        bool roscore_status = status.view()["status"].get_bool().value;
+                        if (!roscore_status)
+                        {
+                            non_functional_components.push_back(comp_iter->first);
+                        }
+                    }
+                    catch (std::exception &e)
+                    {
+                        std::cout << e.what() << std::endl;
+                        non_functional_components.push_back(comp_iter->first);
+                    }
+                }
+                else if (mon_spec_iter->first == "ros/ros_node_monitor")
+                {
+                    auto status = bsoncxx::from_json(mon_spec_iter->second);
+                    try
+                    {
+                        auto node_status = status.view()[comp_iter->first].get_bool().value;
+                        if (!node_status)
+                        {
+                            non_functional_components.push_back(comp_iter->first);
+                        }
+                    }
+                    catch (std::exception &e)
+                    {
+                        non_functional_components.push_back(comp_iter->first);
+                    }
+                }
+            }
+        }
+    }
+
+    if (!non_functional_components.empty())
+    {
+        std::stringstream ss;
+        ss << "The following components are non-functional [";
+        for (int i = 0; i < non_functional_components.size(); i++)
+        {
+            if (i != 0) ss << ", ";
+            ss << non_functional_components.at(i);
+        }
+        ss << "]";
+        ROS_WARN_STREAM(ss.str());
+        return FTSMTransitions::INIT_FAILED;
     }
     else
     {
-        return FTSMTransitions::FAILED_RECOVERY;
+        return FTSMTransitions::INITIALISED;
     }
 }
 
