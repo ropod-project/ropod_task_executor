@@ -99,7 +99,7 @@ void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
     }
 }
 
-void elevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
+void waitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
 {
     ropod_ros_msgs::TaskProgressELEVATOR out_msg;
     out_msg.action_id = msg->action_id;
@@ -111,7 +111,58 @@ void elevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
+    out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_REACHED;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+}
+
+void enterElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg->action_id;
+    out_msg.action_type = msg->type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
     out_msg.status.status_code = ropod_ros_msgs::Status::ENTERING;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::ENTERED_ELEVATOR;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+}
+
+void rideElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg->action_id;
+    out_msg.action_type = msg->type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::DESTINATION_FLOOR_REACHED;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+}
+
+void exitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg->action_id;
+    out_msg.action_type = msg->type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::EXITING;
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::EXITED_ELEVATOR;
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
@@ -135,11 +186,14 @@ int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "execution_mockup");
     ros::NodeHandle nh("~");
-    ros::Subscriber sub1 = nh.subscribe("GOTO", 1, GOTOCallback);
-    ros::Subscriber sub2 = nh.subscribe("ELEVATOR", 1, elevatorCallback);
-    ros::Subscriber sub3 = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
-    ros::Subscriber sub4 = nh.subscribe("DOCK", 1, DOCKCallback);
-    ros::Subscriber sub5 = nh.subscribe("UNDOCK", 1, UNDOCKCallback);
+    ros::Subscriber sub_goto = nh.subscribe("GOTO", 1, GOTOCallback);
+    ros::Subscriber sub_wait_elev = nh.subscribe("WAIT_FOR_ELEVATOR", 1, waitElevatorCallback);
+    ros::Subscriber sub_enter_elev = nh.subscribe("ENTER_ELEVATOR", 1, enterElevatorCallback);
+    ros::Subscriber sub_ride_elev = nh.subscribe("RIDE_ELEVATOR", 1, rideElevatorCallback);
+    ros::Subscriber sub_exit_elev = nh.subscribe("EXIT_ELEVATOR", 1, exitElevatorCallback);
+    ros::Subscriber sub_elev_req = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
+    ros::Subscriber sub_dock = nh.subscribe("DOCK", 1, DOCKCallback);
+    ros::Subscriber sub_undock = nh.subscribe("UNDOCK", 1, UNDOCKCallback);
     goto_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto", 1);
     dock_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock", 1);
     elevator_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator", 1);
