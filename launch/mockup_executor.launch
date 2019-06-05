@@ -4,7 +4,10 @@
         <remap from="~GOTO" to="/ropod_task_executor/GOTO" />
         <remap from="~DOCK" to="/ropod_task_executor/DOCK" />
         <remap from="~UNDOCK" to="/ropod_task_executor/UNDOCK" />
-        <remap from="~ELEVATOR" to="/ropod_task_executor/ENTER_ELEVATOR" />
+        <remap from="~WAIT_FOR_ELEVATOR" to="/ropod_task_executor/WAIT_FOR_ELEVATOR" />
+        <remap from="~ENTER_ELEVATOR" to="/ropod_task_executor/ENTER_ELEVATOR" />
+        <remap from="~RIDE_ELEVATOR" to="/ropod_task_executor/RIDE_ELEVATOR" />
+        <remap from="~EXIT_ELEVATOR" to="/ropod_task_executor/EXIT_ELEVATOR" />
         <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
         <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
         <remap from="~progress_goto" to="/task_progress/goto" />
