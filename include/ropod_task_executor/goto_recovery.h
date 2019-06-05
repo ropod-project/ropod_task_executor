@@ -1,5 +1,5 @@
-#ifndef ACTION_RECOVERY_H
-#define ACTION_RECOVERY_H
+#ifndef GOTO_RECOVERY_H
+#define GOTO_RECOVERY_H
 
 #include <map>
 #include <tuple>
@@ -62,4 +62,4 @@ public:
     bool recover(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action);
 };
 
-#endif /* ACTION_RECOVERY_H */
+#endif /* GOTO_RECOVERY_H */

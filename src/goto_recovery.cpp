@@ -1,4 +1,4 @@
-#include <ropod_task_executor/action_recovery.h>
+#include <ropod_task_executor/goto_recovery.h>
 
 ActionRecovery::ActionRecovery() : path_planner_client("/get_path_plan")
 {

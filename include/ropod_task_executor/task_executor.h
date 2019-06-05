@@ -16,7 +16,7 @@
 #include <mongocxx/instance.hpp>
 
 #include <ftsm_base.h>
-#include <ropod_task_executor/action_recovery.h>
+#include <ropod_task_executor/goto_recovery.h>
 
 
 using namespace ftsm;
