@@ -218,9 +218,9 @@ private:
     std::string collection_name;
 
     /**
-     * Action recovery object
+     * GOTO recovery object
      */
-    ActionRecovery action_recovery;
+    GOTORecovery goto_recovery;
 
     /**
      * Last progress message
@@ -279,7 +279,7 @@ private:
     void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
     void setCurrentActionIndex(int index);
 
-    bool retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+    bool recoverFailedAction();
 
     std::string checkDependsStatuses();
 

@@ -1,103 +1,36 @@
 #include <ropod_task_executor/goto_recovery.h>
 
-ActionRecovery::ActionRecovery() : path_planner_client("/get_path_plan")
+GOTORecovery::GOTORecovery() : path_planner_client("/get_path_plan")
 {
-    // TODO: make this configurable
-    MAX_RETRIES = 3;
 }
 
-ActionRecovery::~ActionRecovery()
+GOTORecovery::~GOTORecovery()
 {
 
 }
 
-void ActionRecovery::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
+void GOTORecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
 {
-    current_task = msg;
+    progress_msg = msg;
+    received_progress_message = true;
 }
 
-void ActionRecovery::setCurrentActionIndex(int current_action_index)
+void GOTORecovery::setTaskDone()
 {
-    this->current_action_index = current_action_index;
-}
-
-void ActionRecovery::setTaskDone()
-{
-    current_task.reset();
-    current_action_index = -1;
-    recovery_index.clear();
+    ActionRecovery::setTaskDone();
     goto_recovery_index.clear();
 }
 
-bool ActionRecovery::recover(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action)
+void GOTORecovery::setSubActionSuccessful()
 {
-    auto it = recovery_index.find(msg->action_id);
-    if (it == recovery_index.end())
-    {
-        RecoveryState rs;
-        rs.level = RETRY;
-        rs.num_retries = 0;
-        recovery_index[msg->action_id] = rs;
-        it = recovery_index.find(msg->action_id);
-    }
-    // first look at current recovery level
-    // then decide on the next level
-    if (it->second.level == RETRY)
-    {
-        // TODO: make this configurable
-        if (it->second.num_retries < MAX_RETRIES)
-        {
-            // stay at the same level
-        }
-        else // go to next level
-        {
-            it->second.level = RECONFIGURE;
-            it->second.num_retries = 0;
-        }
-    }
-    else if (it->second.level == RECONFIGURE)
-    {
-        if (it->second.num_retries < MAX_RETRIES)
-        {
-            // stay at the same level
-        }
-        else
-        {
-            it->second.level = REPLAN;
-            it->second.num_retries = 0;
-        }
-    }
-    else if (it->second.level == REPLAN)
-    {
-        // we should never reach here, because once we've replanned, this action should never be required to recover again
-        ROS_WARN_STREAM("Action already at REPLAN recovery level. This should not happen");
-    }
-
-    // Based on the level decided above, return an appropriate action
-    if (it->second.level == RETRY)
-    {
-        bool rec_status = retryGOTOAction(msg, recovery_action, it);
-        ROS_INFO_STREAM("Currently on recovery level RETRY on retry number " << it->second.num_retries);
-        return rec_status;
-    }
-    else if (it->second.level == RECONFIGURE)
-    {
-        recovery_action = current_task->robot_actions[current_action_index];
-        it->second.num_retries++;
-        // route plan
-        ROS_INFO_STREAM("Currently on recovery level RECONFIGURE on retry number " << it->second.num_retries);
-        bool rec_status = reconfigureGOTOAction(msg, recovery_action, it);
-        return true;
-    }
-    else if (it->second.level == REPLAN)
-    {
-        ROS_INFO_STREAM("Escalating recovery to task planner");
-        return false;
-    }
+    goto_recovery_index.clear();
+    recovery_index.clear();
 }
 
-bool ActionRecovery::retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it)
+bool GOTORecovery::retry()
 {
+    // Here we erase previously achieved areas/subareas up to the failed area/subarea
+
     recovery_action = current_task->robot_actions[current_action_index];
     int failed_area_index = -1;
     int failed_subarea_index = -1;
@@ -108,7 +41,7 @@ bool ActionRecovery::retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr
         bool found = false;
         for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
         {
-            if (recovery_action.areas[i].sub_areas[j].name == msg->subarea_name)
+            if (recovery_action.areas[i].sub_areas[j].name == progress_msg->subarea_name)
             {
                 failed_subarea_index = j;
                 found = true;
@@ -122,17 +55,18 @@ bool ActionRecovery::retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr
     }
     if (failed_area_index != -1 && failed_subarea_index != -1)
     {
-        auto area_it = goto_recovery_index.find(msg->subarea_name);
+        auto area_it = goto_recovery_index.find(progress_msg->subarea_name);
         // first time we are attempting recovery for this area, so keep track of it
         if (area_it == goto_recovery_index.end())
         {
             RecoveryState rs;
             rs.level = RETRY;
             rs.num_retries = 0;
-            goto_recovery_index[msg->subarea_name] = rs;
-            area_it = goto_recovery_index.find(msg->subarea_name);
+            goto_recovery_index[progress_msg->subarea_name] = rs;
+            area_it = goto_recovery_index.find(progress_msg->subarea_name);
         }
         area_it->second.num_retries++;
+        auto it = recovery_index.find(progress_msg->action_id);
         it->second.num_retries = area_it->second.num_retries;
         // TODO: make sure this is not erasing the actual action areas
         recovery_action.areas[failed_area_index].sub_areas.erase(recovery_action.areas[failed_area_index].sub_areas.begin(), recovery_action.areas[failed_area_index].sub_areas.begin() + failed_subarea_index);
@@ -142,12 +76,12 @@ bool ActionRecovery::retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr
     }
     else
     {
-        ROS_WARN_STREAM("Area " << msg->area_name << "or sub_area " << msg->subarea_name << " not found in current action. Cannot retry");
+        ROS_WARN_STREAM("Area " << progress_msg->area_name << "or sub_area " << progress_msg->subarea_name << " not found in current action. Cannot retry");
     }
     return false;
 }
 
-bool ActionRecovery::reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it)
+bool GOTORecovery::reconfigure()
 {
     recovery_action = current_task->robot_actions[current_action_index];
     // index of area where failure occurred
@@ -167,7 +101,7 @@ bool ActionRecovery::reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOT
         bool found = false;
         for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
         {
-            if (recovery_action.areas[i].sub_areas[j].name == msg->subarea_name)
+            if (recovery_action.areas[i].sub_areas[j].name == progress_msg->subarea_name)
             {
                 failed_subarea_index = j;
                 flat_failed_subarea_index = flat_index;
@@ -192,17 +126,18 @@ bool ActionRecovery::reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOT
     {
         // check if this is the first time we're trying to recover from reaching this
         // particular area
-        auto area_it = goto_recovery_index.find(msg->subarea_name);
+        auto area_it = goto_recovery_index.find(progress_msg->subarea_name);
         // first time, so keep track of it
         if (area_it == goto_recovery_index.end())
         {
             RecoveryState rs;
             rs.level = RECONFIGURE;
             rs.num_retries = 0;
-            goto_recovery_index[msg->subarea_name] = rs;
-            area_it = goto_recovery_index.find(msg->subarea_name);
+            goto_recovery_index[progress_msg->subarea_name] = rs;
+            area_it = goto_recovery_index.find(progress_msg->subarea_name);
         }
         area_it->second.num_retries++;
+        auto it = recovery_index.find(progress_msg->action_id);
         it->second.num_retries = area_it->second.num_retries;
 
         // AX = area X
@@ -302,12 +237,17 @@ bool ActionRecovery::reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOT
     }
     else
     {
-        ROS_WARN_STREAM("Area " << msg->area_name << " not found in current action. Cannot reconfigure");
+        ROS_WARN_STREAM("Area " << progress_msg->area_name << " not found in current action. Cannot reconfigure");
     }
     return false;
 }
 
-std::vector<std::tuple<std::string, std::string, std::string>> ActionRecovery::getSubAreaSequence(const ropod_ros_msgs::Action &action)
+bool GOTORecovery::replan()
+{
+    return false;
+}
+
+std::vector<std::tuple<std::string, std::string, std::string>> GOTORecovery::getSubAreaSequence(const ropod_ros_msgs::Action &action)
 {
     std::vector<std::tuple<std::string, std::string, std::string>> seq;
     for (int i = 0; i < action.areas.size(); i++)
@@ -319,3 +259,9 @@ std::vector<std::tuple<std::string, std::string, std::string>> ActionRecovery::g
     }
     return seq;
 }
+
+std::string GOTORecovery::getFailedActionId()
+{
+    return progress_msg->action_id;
+}
+

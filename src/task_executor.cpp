@@ -52,6 +52,7 @@ std::string TaskExecutor::init()
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
 
     std::string transition = checkDependsStatuses();
+    return FTSMTransitions::INITIALISED;
     return transition;
 }
 
@@ -206,7 +207,7 @@ std::string TaskExecutor::running()
         action_failed = false;
         state = INIT;
         std::cout << "Task done! " << std::endl;
-        action_recovery.setTaskDone();
+        goto_recovery.setTaskDone();
         removeTask(current_task->task_id);
         return FTSMTransitions::DONE;
     }
@@ -216,7 +217,7 @@ std::string TaskExecutor::recovering()
 {
     if (state == EXECUTING_ACTION)
     {
-        bool success = retryFailedAction(goto_progress_msg);
+        bool success = recoverFailedAction();
         if (success)
         {
             action_failed = false;
@@ -354,6 +355,7 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
         action_failed = true;
         return;
     }
+    goto_recovery.setSubActionSuccessful();
     if (last_action)
     {
         msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
@@ -478,27 +480,33 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
     //TODO we have now more cases
 }
 
-bool TaskExecutor::retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
+bool TaskExecutor::recoverFailedAction()
 {
-    ropod_ros_msgs::Action recovery_action;
-    bool success = action_recovery.recover(msg, recovery_action);
-    if (success)
+    if (current_action_type == GOTO)
     {
-        action_goto_pub.publish(recovery_action);
+        goto_recovery.setProgressMessage(goto_progress_msg);
+        bool success = goto_recovery.recover();
+        if (success)
+        {
+            ropod_ros_msgs::Action recovery_action = goto_recovery.getRecoveryAction();
+            action_goto_pub.publish(recovery_action);
+        }
+        return success;
     }
-    return success;
 }
 
 void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
 {
     current_task = msg;
-    action_recovery.setCurrentTask(msg);
+    // TODO
+    goto_recovery.setCurrentTask(msg);
 }
 
 void TaskExecutor::setCurrentActionIndex(int index)
 {
     current_action_index = index;
-    action_recovery.setCurrentActionIndex(current_action_index);
+    // TODO
+    goto_recovery.setCurrentActionIndex(current_action_index);
 }
 
 int main(int argc, char **argv)
