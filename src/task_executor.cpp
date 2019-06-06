@@ -53,7 +53,6 @@ std::string TaskExecutor::init()
 
     std::string transition = checkDependsStatuses();
     return FTSMTransitions::INITIALISED;
-    return transition;
 }
 
 std::string TaskExecutor::configuring()
@@ -350,11 +349,13 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
     if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
     		(msg->status.status_code == ropod_ros_msgs::Status::FAILED || msg->status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
     {
-        ROS_ERROR_STREAM("Action failed: " << msg->action_id  << " at area: " << msg->area_name);
+        ROS_ERROR_STREAM("GOTO action failed: " << msg->action_id  << " at area: " << msg->area_name);
         goto_progress_msg = msg;
         action_failed = true;
         return;
     }
+
+    // this will reset retry counts at the area/subarea level
     goto_recovery.setSubActionSuccessful();
     if (last_action)
     {
@@ -398,6 +399,90 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
     {
         action_ongoing = false;
     }
+}
+
+void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+{
+    msg->task_id = current_task->task_id;
+    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+        (msg->status.status_code != ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
+         msg->status.status_code != ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
+         msg->status.status_code != ropod_ros_msgs::Status::SUCCEEDED))
+    {
+        std::string action_type = (current_action_type == DOCK? "DOCK" : "UNDOCK");
+        ROS_ERROR_STREAM(action_type << " action failed: " << msg->action_id);
+        dock_progress_msg = msg;
+        action_failed = true;
+        return;
+    }
+
+    if (last_action)
+    {
+        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
+    task_progress_dock_pub.publish(*msg);
+
+    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
+        msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
+    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
+             msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
+    //TODO we have now more cases
+}
+
+bool TaskExecutor::recoverFailedAction()
+{
+    if (current_action_type == GOTO)
+    {
+        goto_recovery.setProgressMessage(goto_progress_msg);
+        bool success = goto_recovery.recover();
+        if (success)
+        {
+            ropod_ros_msgs::Action recovery_action = goto_recovery.getRecoveryAction();
+            action_goto_pub.publish(recovery_action);
+        }
+        return success;
+    }
+    else if (current_action_type == DOCK)
+    {
+        dock_recovery.setProgressMessage(dock_progress_msg);
+        bool success = dock_recovery.recover();
+        if (success)
+        {
+            ropod_ros_msgs::Action recovery_action = dock_recovery.getRecoveryAction();
+            action_dock_pub.publish(recovery_action);
+        }
+        return success;
+    }
+}
+
+void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
+{
+    current_task = msg;
+    // TODO
+    goto_recovery.setCurrentTask(msg);
+    dock_recovery.setCurrentTask(msg);
+}
+
+void TaskExecutor::setCurrentActionIndex(int index)
+{
+    current_action_index = index;
+    // TODO
+    goto_recovery.setCurrentActionIndex(current_action_index);
+    dock_recovery.setCurrentActionIndex(current_action_index);
 }
 
 void TaskExecutor::queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status)
@@ -448,65 +533,6 @@ void TaskExecutor::removeTask(const std::string &task_id)
     mongocxx::client client(mongocxx::uri{});
     auto coll = client[db_name][collection_name];
     coll.delete_one(bsoncxx::builder::stream::document{} << "task_id" << task_id << bsoncxx::builder::stream::finalize);
-}
-
-void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
-{
-    msg->task_id = current_task->task_id;
-    if (last_action)
-    {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
-    }
-    else
-    {
-        msg ->task_status.status_code = task_status.status_code;
-    }
-
-    task_progress_dock_pub.publish(*msg);
-
-    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
-        msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
-             msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    //TODO we have now more cases
-}
-
-bool TaskExecutor::recoverFailedAction()
-{
-    if (current_action_type == GOTO)
-    {
-        goto_recovery.setProgressMessage(goto_progress_msg);
-        bool success = goto_recovery.recover();
-        if (success)
-        {
-            ropod_ros_msgs::Action recovery_action = goto_recovery.getRecoveryAction();
-            action_goto_pub.publish(recovery_action);
-        }
-        return success;
-    }
-}
-
-void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
-{
-    current_task = msg;
-    // TODO
-    goto_recovery.setCurrentTask(msg);
-}
-
-void TaskExecutor::setCurrentActionIndex(int index)
-{
-    current_action_index = index;
-    // TODO
-    goto_recovery.setCurrentActionIndex(current_action_index);
 }
 
 int main(int argc, char **argv)

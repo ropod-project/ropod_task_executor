@@ -22,6 +22,16 @@ void DOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
     out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
     out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED;
+
+    ROS_INFO_STREAM("Action type: DOCK");
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_FAILED;
+        ROS_INFO_STREAM("DOCK failed");
+    }
     dock_progress_pub.publish(out_msg);
 }
 
@@ -34,6 +44,17 @@ void UNDOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
     out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
     out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED;
+
+    ROS_INFO_STREAM("Action type: UNDOCK");
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_FAILED;
+        ROS_INFO_STREAM("UNDOCK failed");
+    }
+
     dock_progress_pub.publish(out_msg);
 }
 void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
