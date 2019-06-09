@@ -7,11 +7,13 @@
 #include <bsoncxx/builder/stream/document.hpp>
 
 TaskExecutor::TaskExecutor() :
-    FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator", "task_planner"},
+    FTSMBase("task_executor",
+             {"roscore", "route_navigation", "com_mediator", "task_planner", "cart_collector"},
              {{"functional", {{"roscore", "ros/ros_master_monitor"},
                               {"com_mediator", "ros/ros_node_monitor"},
                               {"route_navigation", "ros/ros_node_monitor"},
-                              {"task_planner", "none"}}}}),
+                              {"task_planner", "none"},
+                              {"cart_collector", "none"}}}}),
     state(INIT),
     nh("~"),
     received_task(false),
