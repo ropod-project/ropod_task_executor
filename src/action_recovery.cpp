@@ -33,6 +33,7 @@ bool ActionRecovery::recover()
         ROS_ERROR_STREAM("Action recovery did not receive TaskProgress message, so recovery cannot be performed");
         return false;
     }
+    recovery_actions.clear();
 
     std::string action_id = getFailedActionId();
     auto it = recovery_index.find(action_id);
@@ -101,7 +102,7 @@ bool ActionRecovery::recover()
     return status;
 }
 
-ropod_ros_msgs::Action ActionRecovery::getRecoveryAction()
+std::vector<ropod_ros_msgs::Action> ActionRecovery::getRecoveryActions()
 {
-    return recovery_action;
+    return recovery_actions;
 }

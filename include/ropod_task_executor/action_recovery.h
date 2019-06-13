@@ -2,6 +2,7 @@
 #define ACTION_RECOVERY_H
 
 #include <map>
+#include <vector>
 #include <ros/ros.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/Action.h>
@@ -29,12 +30,11 @@ protected:
 
     ropod_ros_msgs::Task::Ptr current_task;
     int current_action_index;
-    int max_retries;
     bool received_progress_message;
 
     // this variable is populated with the recovery
-    // action to be performed (if recovery is successful)
-    ropod_ros_msgs::Action recovery_action;
+    // action(s) to be performed (if recovery is successful)
+    std::vector<ropod_ros_msgs::Action> recovery_actions;
     const static int MAX_RETRIES = 3;
 
     virtual bool retry() = 0;
@@ -49,7 +49,7 @@ public:
     void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
     void setCurrentActionIndex(int current_action_index);
     void setTaskDone();
-    ropod_ros_msgs::Action getRecoveryAction();
+    std::vector<ropod_ros_msgs::Action> getRecoveryActions();
 
 
     bool recover();

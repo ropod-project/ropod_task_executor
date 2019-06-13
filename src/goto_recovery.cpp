@@ -31,7 +31,7 @@ bool GOTORecovery::retry()
 {
     // Here we erase previously achieved areas/subareas up to the failed area/subarea
 
-    recovery_action = current_task->robot_actions[current_action_index];
+    ropod_ros_msgs::Action recovery_action = current_task->robot_actions[current_action_index];
     int failed_area_index = -1;
     int failed_subarea_index = -1;
     // find the area where GOTO action failed
@@ -72,6 +72,7 @@ bool GOTORecovery::retry()
         recovery_action.areas[failed_area_index].sub_areas.erase(recovery_action.areas[failed_area_index].sub_areas.begin(), recovery_action.areas[failed_area_index].sub_areas.begin() + failed_subarea_index);
 
         recovery_action.areas.erase(recovery_action.areas.begin(), recovery_action.areas.begin() + failed_area_index);
+        recovery_actions.push_back(recovery_action);
         return true;
     }
     else
@@ -83,7 +84,7 @@ bool GOTORecovery::retry()
 
 bool GOTORecovery::reconfigure()
 {
-    recovery_action = current_task->robot_actions[current_action_index];
+    ropod_ros_msgs::Action recovery_action = current_task->robot_actions[current_action_index];
     // index of area where failure occurred
     int failed_area_index = -1;
     // index of sub_area within area where failure occurred
@@ -227,6 +228,7 @@ bool GOTORecovery::reconfigure()
                 recovery_action.areas.insert(recovery_action.areas.begin() + insert_index, result->path_plan.areas[i]);
                 insert_index++;
             }
+            recovery_actions.push_back(recovery_action);
             return true;
         }
         else

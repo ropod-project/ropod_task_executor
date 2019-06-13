@@ -18,6 +18,7 @@
 #include <ftsm_base.h>
 #include <ropod_task_executor/goto_recovery.h>
 #include <ropod_task_executor/dock_recovery.h>
+#include <ropod_task_executor/elevator_recovery.h>
 
 
 using namespace ftsm;
@@ -229,6 +230,11 @@ private:
     DOCKRecovery dock_recovery;
 
     /**
+     * Elevator recovery object
+     */
+    ElevatorRecovery elevator_recovery;
+
+    /**
      * Last GOTO progress message
      */
     ropod_ros_msgs::TaskProgressGOTO::Ptr goto_progress_msg;
@@ -237,6 +243,11 @@ private:
      * Last DOCK progress message
      */
     ropod_ros_msgs::TaskProgressDOCK::Ptr dock_progress_msg;
+
+    /**
+     * Last ELEVATOR progress message
+     */
+    ropod_ros_msgs::TaskProgressELEVATOR::Ptr elevator_progress_msg;
 
     /**
      * callback for reply to elevator request

@@ -18,7 +18,8 @@ void DOCKRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK::Pt
 bool DOCKRecovery::retry()
 {
     // just retry the same action
-    recovery_action = current_task->robot_actions[current_action_index];
+    ropod_ros_msgs::Action recovery_action = current_task->robot_actions[current_action_index];
+    recovery_actions.push_back(recovery_action);
     return true;
 }
 
