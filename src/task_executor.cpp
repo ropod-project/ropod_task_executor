@@ -6,6 +6,8 @@
 #include <bsoncxx/types.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 
+void printTask(ropod_ros_msgs::Task::Ptr &msg);
+
 TaskExecutor::TaskExecutor() :
     FTSMBase("task_executor", {"roscore", "route_navigation", "com_mediator"},
              {{"functional", {{"roscore", "ros/ros_master_monitor"},
@@ -141,15 +143,15 @@ std::string TaskExecutor::running()
             action_wait_for_elevator_pub.publish(action);
             current_action_type = WAIT_FOR_ELEVATOR;
         }
-        else if (action.type == "RIDE_ELEVATOR")
-        {
-            action_ride_elevator_pub.publish(action);
-            current_action_type = RIDE_ELEVATOR;
-        }
         else if (action.type == "ENTER_ELEVATOR")
         {
             action_enter_elevator_pub.publish(action);
             current_action_type = ENTER_ELEVATOR;
+        }
+        else if (action.type == "RIDE_ELEVATOR")
+        {
+            action_ride_elevator_pub.publish(action);
+            current_action_type = RIDE_ELEVATOR;
         }
         else if (action.type == "EXIT_ELEVATOR")
         {
@@ -504,8 +506,14 @@ bool TaskExecutor::recoverFailedAction()
             std::vector<ropod_ros_msgs::Action> recovery_actions = elevator_recovery.getRecoveryActions();
             if (!recovery_actions.empty())
             {
-                // TODO: here we need to insert recovery actions into current task
-                //action_dock_pub.publish(recovery_actions[0]);
+                auto insert_it = current_task->robot_actions.begin() + current_action_index;
+                // delete current action
+                current_task->robot_actions.erase(insert_it);
+                // insert recovery actions at current location
+                current_task->robot_actions.insert(insert_it, recovery_actions.begin(), recovery_actions.end());
+                // change state to DISPATCHING so that the first recovery action will be executed
+                // TODO: maybe it's not a good idea to change the state here..
+                state = DISPATCHING_ACTION;
             }
         }
         return success;
@@ -578,6 +586,14 @@ void TaskExecutor::removeTask(const std::string &task_id)
     mongocxx::client client(mongocxx::uri{});
     auto coll = client[db_name][collection_name];
     coll.delete_one(bsoncxx::builder::stream::document{} << "task_id" << task_id << bsoncxx::builder::stream::finalize);
+}
+
+void printTask(ropod_ros_msgs::Task::Ptr &msg)
+{
+    for (int i = 0; i < msg->robot_actions.size(); i++)
+    {
+        std::cout << msg->robot_actions[i].type << std::endl;
+    }
 }
 
 int main(int argc, char **argv)
