@@ -153,7 +153,7 @@ void waitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     std::cin >> c;
     if (c != 'y' && c != 'Y')
     {
-        out_msg.status.status_code = ropod_ros_msgs::Status::TIMEOUT_WAITING_FOR_ELEVATOR;
+        out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_WAIT_TIMEOUT;
         ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed");
     }
     else
@@ -187,7 +187,7 @@ void enterElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     std::cin >> c;
     if (c != 'y' && c != 'Y')
     {
-        out_msg.status.status_code = ropod_ros_msgs::Status::CANNOT_ENTER_ELEVATOR;
+        out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED;
         ROS_INFO_STREAM("ENTER_ELEVATOR failed");
     }
     else
