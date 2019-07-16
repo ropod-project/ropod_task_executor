@@ -16,7 +16,9 @@
 #include <mongocxx/instance.hpp>
 
 #include <ftsm_base.h>
-#include <ropod_task_executor/action_recovery.h>
+#include <ropod_task_executor/goto_recovery.h>
+#include <ropod_task_executor/dock_recovery.h>
+#include <ropod_task_executor/elevator_recovery.h>
 
 
 using namespace ftsm;
@@ -218,14 +220,34 @@ private:
     std::string collection_name;
 
     /**
-     * Action recovery object
+     * GOTO recovery object
      */
-    ActionRecovery action_recovery;
+    GOTORecovery goto_recovery;
 
     /**
-     * Last progress message
+     * DOCK recovery object
+     */
+    DOCKRecovery dock_recovery;
+
+    /**
+     * Elevator recovery object
+     */
+    ElevatorRecovery elevator_recovery;
+
+    /**
+     * Last GOTO progress message
      */
     ropod_ros_msgs::TaskProgressGOTO::Ptr goto_progress_msg;
+
+    /**
+     * Last DOCK progress message
+     */
+    ropod_ros_msgs::TaskProgressDOCK::Ptr dock_progress_msg;
+
+    /**
+     * Last ELEVATOR progress message
+     */
+    ropod_ros_msgs::TaskProgressELEVATOR::Ptr elevator_progress_msg;
 
     /**
      * callback for reply to elevator request
@@ -279,7 +301,9 @@ private:
     void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
     void setCurrentActionIndex(int index);
 
-    bool retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+    bool recoverFailedAction();
+
+    std::string checkDependsStatuses();
 
 public:
     TaskExecutor();

@@ -39,6 +39,9 @@ catkin_package(
 
 add_executable(ropod_task_executor
     src/task_executor.cpp
+    src/goto_recovery.cpp
+    src/dock_recovery.cpp
+    src/elevator_recovery.cpp
     src/action_recovery.cpp
     /opt/ropod/ropod_common/ropodcpp/ftsm/src/ftsm_base.cpp
     /opt/ropod/ftsm/cppftsm/src/ftsm.cpp

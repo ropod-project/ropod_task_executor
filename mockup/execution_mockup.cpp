@@ -22,6 +22,16 @@ void DOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
     out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
     out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED;
+
+    ROS_INFO_STREAM("Action type: DOCK");
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_FAILED;
+        ROS_INFO_STREAM("DOCK failed");
+    }
     dock_progress_pub.publish(out_msg);
 }
 
@@ -34,6 +44,17 @@ void UNDOCKCallback(const ropod_ros_msgs::Action::Ptr &msg)
     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
     out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
     out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED;
+
+    ROS_INFO_STREAM("Action type: UNDOCK");
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_FAILED;
+        ROS_INFO_STREAM("UNDOCK failed");
+    }
+
     dock_progress_pub.publish(out_msg);
 }
 void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg)
@@ -111,7 +132,35 @@ void waitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
-    out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_REACHED;
+    ROS_INFO_STREAM("Action type: WAIT_FOR_ELEVATOR");
+    ROS_INFO_STREAM("Succeed in reaching waiting waypoint? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE;
+        ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed");
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_REACHED;
+    }
+    elevator_progress_pub.publish(out_msg);
+    ros::Duration(1.0).sleep();
+
+    ROS_INFO_STREAM("Action type: WAIT_FOR_ELEVATOR");
+    ROS_INFO_STREAM("Did door open in time? (y/n)");
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::TIMEOUT_WAITING_FOR_ELEVATOR;
+        ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed");
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::DOOR_OPENED;
+    }
+
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
@@ -132,7 +181,20 @@ void enterElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg)
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 
-    out_msg.status.status_code = ropod_ros_msgs::Status::ENTERED_ELEVATOR;
+    ROS_INFO_STREAM("Action type: ENTER_ELEVATOR");
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::CANNOT_ENTER_ELEVATOR;
+        ROS_INFO_STREAM("ENTER_ELEVATOR failed");
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::ENTERED_ELEVATOR;
+    }
+
     elevator_progress_pub.publish(out_msg);
     ros::Duration(1.0).sleep();
 }

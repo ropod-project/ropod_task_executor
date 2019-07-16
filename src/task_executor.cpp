@@ -6,6 +6,8 @@
 #include <bsoncxx/types.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 
+void printTask(ropod_ros_msgs::Task::Ptr &msg);
+
 TaskExecutor::TaskExecutor() :
     FTSMBase("task_executor",
              {"roscore", "route_navigation", "com_mediator", "task_planner", "cart_collector"},
@@ -54,6 +56,7 @@ std::string TaskExecutor::init()
 
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
 
+    std::string transition = checkDependsStatuses();
     return FTSMTransitions::INITIALISED;
 }
 
@@ -143,15 +146,15 @@ std::string TaskExecutor::running()
             action_wait_for_elevator_pub.publish(action);
             current_action_type = WAIT_FOR_ELEVATOR;
         }
-        else if (action.type == "RIDE_ELEVATOR")
-        {
-            action_ride_elevator_pub.publish(action);
-            current_action_type = RIDE_ELEVATOR;
-        }
         else if (action.type == "ENTER_ELEVATOR")
         {
             action_enter_elevator_pub.publish(action);
             current_action_type = ENTER_ELEVATOR;
+        }
+        else if (action.type == "RIDE_ELEVATOR")
+        {
+            action_ride_elevator_pub.publish(action);
+            current_action_type = RIDE_ELEVATOR;
         }
         else if (action.type == "EXIT_ELEVATOR")
         {
@@ -208,7 +211,7 @@ std::string TaskExecutor::running()
         action_failed = false;
         state = INIT;
         std::cout << "Task done! " << std::endl;
-        action_recovery.setTaskDone();
+        goto_recovery.setTaskDone();
         removeTask(current_task->task_id);
         return FTSMTransitions::DONE;
     }
@@ -216,15 +219,91 @@ std::string TaskExecutor::running()
 
 std::string TaskExecutor::recovering()
 {
-    bool success = retryFailedAction(goto_progress_msg);
-    if (success)
+    if (state == EXECUTING_ACTION)
     {
-        action_failed = false;
+        bool success = recoverFailedAction();
+        if (success)
+        {
+            action_failed = false;
+            return FTSMTransitions::DONE_RECOVERING;
+        }
+        else
+        {
+            // TODO: at this point we need to inform the FMS
+            // with a failed TaskProgress message
+            return FTSMTransitions::FAILED_RECOVERY;
+        }
+    }
+    else if (state == INIT)
+    {
+        ROS_WARN_STREAM("Retrying initialization after 2 seconds");
+        ros::Duration(2).sleep();
         return FTSMTransitions::DONE_RECOVERING;
+    }
+}
+
+std::string TaskExecutor::checkDependsStatuses()
+{
+    std::vector<std::string> non_functional_components;
+    for (MonitorIterator mon_iter = this->depend_statuses.begin(); mon_iter != this->depend_statuses.end(); ++mon_iter)
+    {
+        for (ComponentIterator comp_iter = mon_iter->second.begin(); comp_iter != mon_iter->second.end(); ++comp_iter)
+        {
+            for (MonitorSpecIterator mon_spec_iter = comp_iter->second.begin(); mon_spec_iter != comp_iter->second.end(); ++mon_spec_iter)
+            {
+                if (mon_spec_iter->first == "ros/ros_master_monitor")
+                {
+                    auto status = bsoncxx::from_json(mon_spec_iter->second);
+                    try
+                    {
+                        bool roscore_status = status.view()["status"].get_bool().value;
+                        if (!roscore_status)
+                        {
+                            non_functional_components.push_back(comp_iter->first);
+                        }
+                    }
+                    catch (std::exception &e)
+                    {
+                        std::cout << e.what() << std::endl;
+                        non_functional_components.push_back(comp_iter->first);
+                    }
+                }
+                else if (mon_spec_iter->first == "ros/ros_node_monitor")
+                {
+                    auto status = bsoncxx::from_json(mon_spec_iter->second);
+                    try
+                    {
+                        auto node_status = status.view()[comp_iter->first].get_bool().value;
+                        if (!node_status)
+                        {
+                            non_functional_components.push_back(comp_iter->first);
+                        }
+                    }
+                    catch (std::exception &e)
+                    {
+                        non_functional_components.push_back(comp_iter->first);
+                    }
+                }
+            }
+        }
+    }
+
+    if (!non_functional_components.empty())
+    {
+        std::stringstream ss;
+        ss << "The following components are non-functional [";
+        for (int i = 0; i < non_functional_components.size(); i++)
+        {
+            if (i != 0) ss << ", ";
+            ss << non_functional_components.at(i);
+        }
+        ss << "]";
+        ROS_WARN_STREAM(ss.str());
+        return FTSMTransitions::INIT_FAILED;
     }
     else
     {
-        return FTSMTransitions::FAILED_RECOVERY;
+        return FTSMTransitions::INITIALISED;
     }
 }
 
@@ -275,13 +354,17 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
 {
     msg->task_id = current_task->task_id;
     if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
-    		(msg->status.status_code == ropod_ros_msgs::Status::FAILED || msg->status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
+    		(msg->status.status_code == ropod_ros_msgs::Status::FAILED ||
+             msg->status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
     {
-        ROS_ERROR_STREAM("Action failed: " << msg->action_id  << " at area: " << msg->area_name);
+        ROS_ERROR_STREAM("GOTO action failed: " << msg->action_id  << " at area: " << msg->area_name);
         goto_progress_msg = msg;
         action_failed = true;
         return;
     }
+
+    // this will reset retry counts at the area/subarea level
+    goto_recovery.setSubActionSuccessful();
     if (last_action)
     {
         msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
@@ -306,6 +389,19 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
 void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg)
 {
     msg->task_id = current_task->task_id;
+
+    if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
+            (msg->status.status_code == ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE ||
+             msg->status.status_code == ropod_ros_msgs::Status::TIMEOUT_WAITING_FOR_ELEVATOR ||
+             msg->status.status_code == ropod_ros_msgs::Status::CANNOT_ENTER_ELEVATOR ||
+             msg->status.status_code == ropod_ros_msgs::Status::CANNOT_EXIT_ELEVATOR))
+    {
+        ROS_ERROR_STREAM("ENTER_ELEVATOR action failed: " << msg->action_id);
+        elevator_progress_msg = msg;
+        action_failed = true;
+        return;
+    }
+
     if (last_action)
     {
         msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
@@ -319,11 +415,130 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
     task_progress_elevator_pub.publish(*msg);
 
     if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
+        msg->action_id == current_action_id &&
+    	    (msg->status.status_code == ropod_ros_msgs::Status::DOOR_OPENED ||
+             msg->status.status_code == ropod_ros_msgs::Status::ENTERED_ELEVATOR ||
+             msg->status.status_code == ropod_ros_msgs::Status::DESTINATION_FLOOR_REACHED ||
+             msg->status.status_code == ropod_ros_msgs::Status::EXITED_ELEVATOR))
+    {
+        action_ongoing = false;
+    }
+}
+
+void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+{
+    msg->task_id = current_task->task_id;
+    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+        (msg->status.status_code != ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
+         msg->status.status_code != ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
+         msg->status.status_code != ropod_ros_msgs::Status::SUCCEEDED))
+    {
+        std::string action_type = (current_action_type == DOCK? "DOCK" : "UNDOCK");
+        ROS_ERROR_STREAM(action_type << " action failed: " << msg->action_id);
+        dock_progress_msg = msg;
+        action_failed = true;
+        return;
+    }
+
+    if (last_action)
+    {
+        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+    }
+    else
+    {
+        msg ->task_status.status_code = task_status.status_code;
+    }
+
+    task_progress_dock_pub.publish(*msg);
+
+    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
         msg->action_id == current_action_id)
     {
         action_ongoing = false;
     }
+    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
+             msg->action_id == current_action_id)
+    {
+        action_ongoing = false;
+    }
+    //TODO we have now more cases
+}
+
+bool TaskExecutor::recoverFailedAction()
+{
+    if (current_action_type == GOTO)
+    {
+        goto_recovery.setProgressMessage(goto_progress_msg);
+        bool success = goto_recovery.recover();
+        if (success)
+        {
+            std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions();
+            if (!recovery_actions.empty())
+            {
+                action_goto_pub.publish(recovery_actions[0]);
+            }
+        }
+        return success;
+    }
+    else if (current_action_type == DOCK)
+    {
+        dock_recovery.setProgressMessage(dock_progress_msg);
+        bool success = dock_recovery.recover();
+        if (success)
+        {
+            std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions();
+            if (!recovery_actions.empty())
+            {
+                action_dock_pub.publish(recovery_actions[0]);
+            }
+        }
+        return success;
+    }
+    else if (current_action_type == WAIT_FOR_ELEVATOR ||
+             current_action_type == ENTER_ELEVATOR ||
+             current_action_type == RIDE_ELEVATOR ||
+             current_action_type == EXIT_ELEVATOR)
+    {
+        elevator_recovery.setProgressMessage(elevator_progress_msg);
+        bool success = elevator_recovery.recover();
+        if (success)
+        {
+            std::vector<ropod_ros_msgs::Action> recovery_actions = elevator_recovery.getRecoveryActions();
+            if (!recovery_actions.empty())
+            {
+                auto insert_it = current_task->robot_actions.begin() + current_action_index;
+                // delete current action
+                current_task->robot_actions.erase(insert_it);
+                // insert recovery actions at current location
+                current_task->robot_actions.insert(insert_it, recovery_actions.begin(), recovery_actions.end());
+                // change state to DISPATCHING so that the first recovery action will be executed
+                // TODO: maybe it's not a good idea to change the state here..
+                state = DISPATCHING_ACTION;
+            }
+        }
+        return success;
+    }
+}
+
+void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
+{
+    current_task = msg;
+    // TODO
+    goto_recovery.setCurrentTask(msg);
+    dock_recovery.setCurrentTask(msg);
+    elevator_recovery.setCurrentTask(msg);
+}
+
+void TaskExecutor::setCurrentActionIndex(int index)
+{
+    current_action_index = index;
+    // TODO
+    goto_recovery.setCurrentActionIndex(current_action_index);
+    dock_recovery.setCurrentActionIndex(current_action_index);
+    elevator_recovery.setCurrentActionIndex(current_action_index);
 }
 
 void TaskExecutor::queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status)
@@ -376,57 +591,12 @@ void TaskExecutor::removeTask(const std::string &task_id)
     coll.delete_one(bsoncxx::builder::stream::document{} << "task_id" << task_id << bsoncxx::builder::stream::finalize);
 }
 
-void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+void printTask(ropod_ros_msgs::Task::Ptr &msg)
 {
-    msg->task_id = current_task->task_id;
-    if (last_action)
+    for (int i = 0; i < msg->robot_actions.size(); i++)
     {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+        std::cout << msg->robot_actions[i].type << std::endl;
     }
-    else
-    {
-        msg ->task_status.status_code = task_status.status_code;
-    }
-
-    task_progress_dock_pub.publish(*msg);
-
-    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
-        msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
-             msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    //TODO we have now more cases
-}
-
-bool TaskExecutor::retryFailedAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
-{
-    ropod_ros_msgs::Action recovery_action;
-    bool success = action_recovery.recover(msg, recovery_action);
-    if (success)
-    {
-        action_goto_pub.publish(recovery_action);
-    }
-    return success;
-}
-
-void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
-{
-    current_task = msg;
-    action_recovery.setCurrentTask(msg);
-}
-
-void TaskExecutor::setCurrentActionIndex(int index)
-{
-    current_action_index = index;
-    action_recovery.setCurrentActionIndex(current_action_index);
 }
 
 int main(int argc, char **argv)

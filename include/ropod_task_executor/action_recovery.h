@@ -2,23 +2,19 @@
 #define ACTION_RECOVERY_H
 
 #include <map>
-#include <tuple>
 #include <vector>
 #include <ros/ros.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/Action.h>
-#include <ropod_ros_msgs/TaskProgressGOTO.h>
-#include <actionlib/client/simple_action_client.h>
-#include <ropod_ros_msgs/GetPathPlanAction.h>
 
 class ActionRecovery
 {
-private:
+protected:
     enum RecoveryLevel
     {
-        RETRY, // simply retry the same action from current state
-        RECONFIGURE, // depends on the action (GOTO: replan route)
-        REPLAN // Replan task
+        RETRY,
+        RECONFIGURE,
+        REPLAN
     };
 
     struct RecoveryState
@@ -28,26 +24,23 @@ private:
         double last_recover_time; // last time (unix timestamp) a recovery action was called for this action
     };
 
-    bool retryGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
-    bool reconfigureGOTOAction(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action, std::map<std::string, RecoveryState>::iterator &it);
-
-    /**
-     * Returns a flatted list of (area, subarea, subarea id) tuples in the action
-     */
-    std::vector<std::tuple<std::string, std::string, std::string>> getSubAreaSequence(const ropod_ros_msgs::Action &action);
-
     // index of actions for whom recovery has been initiated
     // key: action_id, value: RecoveryState
     std::map<std::string, RecoveryState> recovery_index;
-    // index of subareas for whom recovery has been initiated
-    // key: sub_area_id, value: RecoveryState
-    std::map<std::string, RecoveryState> goto_recovery_index;
 
     ropod_ros_msgs::Task::Ptr current_task;
     int current_action_index;
-    int MAX_RETRIES;
+    bool received_progress_message;
 
-    actionlib::SimpleActionClient<ropod_ros_msgs::GetPathPlanAction> path_planner_client;
+    // this variable is populated with the recovery
+    // action(s) to be performed (if recovery is successful)
+    std::vector<ropod_ros_msgs::Action> recovery_actions;
+    const static int MAX_RETRIES = 3;
+
+    virtual bool retry() = 0;
+    virtual bool reconfigure() = 0;
+    virtual bool replan() = 0;
+    virtual std::string getFailedActionId() = 0;
 
 public:
     ActionRecovery();
@@ -56,10 +49,10 @@ public:
     void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
     void setCurrentActionIndex(int current_action_index);
     void setTaskDone();
-    /**
-     * Returns an action to recover from a failed GOTO action
-     */
-    bool recover(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg, ropod_ros_msgs::Action &recovery_action);
+    std::vector<ropod_ros_msgs::Action> getRecoveryActions();
+
+
+    bool recover();
 };
 
 #endif /* ACTION_RECOVERY_H */
