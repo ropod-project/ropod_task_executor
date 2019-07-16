@@ -20,7 +20,7 @@ void ElevatorRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressELEV
 
 bool ElevatorRecovery::retry()
 {
-    if (progress_msg->status.status_code == ropod_ros_msgs::Status::CANNOT_ENTER_ELEVATOR)
+    if (progress_msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED)
     {
         ropod_ros_msgs::Action current_action = current_task->robot_actions[current_action_index];
         ropod_ros_msgs::Action exit_elevator_action;

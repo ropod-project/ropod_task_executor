@@ -392,9 +392,9 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
 
     if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
             (msg->status.status_code == ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE ||
-             msg->status.status_code == ropod_ros_msgs::Status::TIMEOUT_WAITING_FOR_ELEVATOR ||
-             msg->status.status_code == ropod_ros_msgs::Status::CANNOT_ENTER_ELEVATOR ||
-             msg->status.status_code == ropod_ros_msgs::Status::CANNOT_EXIT_ELEVATOR))
+             msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_WAIT_TIMEOUT ||
+             msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED ||
+             msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_EXITING_FAILED))
     {
         ROS_ERROR_STREAM("ENTER_ELEVATOR action failed: " << msg->action_id);
         elevator_progress_msg = msg;
