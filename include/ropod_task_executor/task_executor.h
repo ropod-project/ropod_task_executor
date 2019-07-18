@@ -231,7 +231,7 @@ private:
     /**
      * Last ELEVATOR progress message
      */
-    ropod_ros_msgs::TaskProgressELEVATOR::Ptr elevator_progress_msg;
+    ropod_ros_msgs::TaskProgressELEVATOR elevator_progress_msg;
 
     /**
      * callback for result of goto action server request
@@ -258,6 +258,15 @@ private:
      */
     void elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg);
 
+    /**
+     * callback for result of elevator related action server request
+     */
+    void NavElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result);
+
+    /**
+     * callback for feedback of elevator related action server request
+     */
+    void NavElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback);
     /**
      * Subscriber callback for task messages
      */
