@@ -15,10 +15,9 @@ ros::Publisher elevator_reply_pub;
 bool ask_for_failure = true;
 std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::GoToAction>> goto_server;
 std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>> dock_server;
-/* std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>> nav_elevator_server; */
+std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>> nav_elevator_server;
 
-
-bool dummy_goto_handler(const ropod_ros_msgs::Action msg)
+bool dummyGotoHandler(const ropod_ros_msgs::Action msg)
 {
     int num_areas = msg.areas.size();
     ROS_INFO_STREAM("Received action: " << msg.action_id << " with " << num_areas << " areas");
@@ -84,7 +83,7 @@ bool dummy_goto_handler(const ropod_ros_msgs::Action msg)
     return !failed;
 }
 
-bool dummy_dock_handler(const ropod_ros_msgs::Action msg)
+bool dummyDockHandler(const ropod_ros_msgs::Action msg)
 {
     ROS_INFO_STREAM("Received action: " << msg.action_id << " of type " << msg.type);
     bool success = true;
@@ -125,9 +124,144 @@ bool dummy_dock_handler(const ropod_ros_msgs::Action msg)
     return success;
 }
 
-void goto_action_cb(const ropod_ros_msgs::GoToGoalConstPtr& goal)
+bool dummyWaitForElevatorHandler(const ropod_ros_msgs::Action msg)
 {
-    bool success = dummy_goto_handler(goal->action);
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg.action_id;
+    out_msg.action_type = msg.type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::WAITING;
+    ropod_ros_msgs::NavElevatorFeedback nav_elevator_feedback;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+
+    ROS_INFO_STREAM("Action type: WAIT_FOR_ELEVATOR");
+    ROS_INFO_STREAM("Succeed in reaching waiting waypoint? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE;
+        ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed");
+        return false;
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_REACHED;
+    }
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+
+    ROS_INFO_STREAM("Action type: WAIT_FOR_ELEVATOR");
+    ROS_INFO_STREAM("Did door open in time? (y/n)");
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_WAIT_TIMEOUT;
+        ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed");
+        return false;
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::DOOR_OPENED;
+    }
+
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+    return true;
+}
+
+bool dummyEnterElevatorHandler(const ropod_ros_msgs::Action msg)
+{
+    bool success = true;
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg.action_id;
+    out_msg.action_type = msg.type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::ENTERING;
+    ropod_ros_msgs::NavElevatorFeedback nav_elevator_feedback;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+
+    ROS_INFO_STREAM("Action type: ENTER_ELEVATOR");
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED;
+        ROS_INFO_STREAM("ENTER_ELEVATOR failed");
+        success = false;
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::ENTERED_ELEVATOR;
+    }
+
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+    return success;
+}
+
+bool dummyRideElevatorHandler(const ropod_ros_msgs::Action msg)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg.action_id;
+    out_msg.action_type = msg.type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::DESTINATION_FLOOR_REACHED;
+    ropod_ros_msgs::NavElevatorFeedback nav_elevator_feedback;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+    return true;
+}
+
+bool dummyExitElevatorHandler(const ropod_ros_msgs::Action msg)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR out_msg;
+    out_msg.action_id = msg.action_id;
+    out_msg.action_type = msg.type;
+    out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::EXITING;
+    ropod_ros_msgs::NavElevatorFeedback nav_elevator_feedback;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::EXITED_ELEVATOR;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+
+    out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
+    nav_elevator_feedback.feedback = out_msg;
+    nav_elevator_server->publishFeedback(nav_elevator_feedback);
+    ros::Duration(1.0).sleep();
+    return true;
+}
+
+void gotoActionCb(const ropod_ros_msgs::GoToGoalConstPtr& goal)
+{
+    bool success = dummyGotoHandler(goal->action);
     ROS_INFO_STREAM("Finished executing action\n");
     ropod_ros_msgs::GoToResult goto_result;
     goto_result.success = success;
@@ -141,9 +275,9 @@ void goto_action_cb(const ropod_ros_msgs::GoToGoalConstPtr& goal)
     }
 }
 
-void dock_action_cb(const ropod_ros_msgs::DockGoalConstPtr& goal)
+void dockActionCb(const ropod_ros_msgs::DockGoalConstPtr& goal)
 {
-    bool success = dummy_dock_handler(goal->action);
+    bool success = dummyDockHandler(goal->action);
     ROS_INFO_STREAM("Finished executing action\n");
     ropod_ros_msgs::DockResult dock_result;
     dock_result.success = success;
@@ -157,169 +291,72 @@ void dock_action_cb(const ropod_ros_msgs::DockGoalConstPtr& goal)
     }
 }
 
-/* void goto_action_cb(const ropod_ros_msgs::GoToGoalConstPtr& goal) */
-/* { */
-/*     ropod_ros_msgs::GoToResult goto_result; */
-/*     for (int i = 0; i < goal->action.areas.size(); i++) */
-/*     { */
-/*         ropod_ros_msgs::GoToFeedback goto_feedback; */
-/*         goto_feedback.feedback.area_name = goal->action.areas[i].name; */
-/*         goto_server->publishFeedback(goto_feedback); */
-/*         ros::Duration(0.5).sleep(); // mock processing of the action request */
-/*     } */
-/*     goto_server->setSucceeded(goto_result); */
-/* } */
+void navElevatorActionCb(const ropod_ros_msgs::NavElevatorGoalConstPtr& goal)
+{
+    bool success = true;
+    if (goal->action.type == "WAIT_FOR_ELEVATOR")
+    {
+        success = dummyWaitForElevatorHandler(goal->action);
+    }
+    else if (goal->action.type == "ENTER_ELEVATOR")
+    {
+        success = dummyEnterElevatorHandler(goal->action);
+    }
+    else if (goal->action.type == "RIDE_ELEVATOR")
+    {
+        success = dummyRideElevatorHandler(goal->action);
+    }
+    else if (goal->action.type == "EXIT_ELEVATOR")
+    {
+        success = dummyExitElevatorHandler(goal->action);
+    }
+    ROS_INFO_STREAM("Finished executing action\n");
+    ropod_ros_msgs::NavElevatorResult nav_elevator_result;
+    nav_elevator_result.success = success;
+    if (nav_elevator_result.success)
+    {
+        nav_elevator_server->setSucceeded(nav_elevator_result);
+    }
+    else
+    {
+        nav_elevator_server->setAborted(nav_elevator_result);
+    }
+}
+
+void elevatorRequestCallback(const ropod_ros_msgs::ElevatorRequest::Ptr &msg)
+{
+    // publish reply
+    ropod_ros_msgs::ElevatorRequestReply out_msg;
+    out_msg.query_id = msg->query_id;
+    out_msg.query_success = true;
+    out_msg.elevator_id = 0;
+    out_msg.elevator_door_id = 1;
+    elevator_reply_pub.publish(out_msg);
+}
 
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "execution_mockup");
     ros::NodeHandle nh("~");
-    /* ros::Subscriber sub_goto = nh.subscribe("GOTO", 1, GOTOCallback); */
-    /* ros::Subscriber sub_wait_elev = nh.subscribe("WAIT_FOR_ELEVATOR", 1, waitElevatorCallback); */
-    /* ros::Subscriber sub_enter_elev = nh.subscribe("ENTER_ELEVATOR", 1, enterElevatorCallback); */
-    /* ros::Subscriber sub_ride_elev = nh.subscribe("RIDE_ELEVATOR", 1, rideElevatorCallback); */
-    /* ros::Subscriber sub_exit_elev = nh.subscribe("EXIT_ELEVATOR", 1, exitElevatorCallback); */
-    /* ros::Subscriber sub_elev_req = nh.subscribe("elevator_request", 1, elevatorRequestCallback); */
-    /* ros::Subscriber sub_dock = nh.subscribe("DOCK", 1, DOCKCallback); */
-    /* ros::Subscriber sub_undock = nh.subscribe("UNDOCK", 1, UNDOCKCallback); */
+
+    ros::Subscriber sub_elev_req = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
+    elevator_reply_pub = nh.advertise<ropod_ros_msgs::ElevatorRequestReply>("elevator_reply", 1);
+
     goto_server.reset(
             new actionlib::SimpleActionServer<ropod_ros_msgs::GoToAction>(
-                nh, "/ropod/goto", boost::bind(goto_action_cb, _1),false));
+                nh, "/ropod/goto", boost::bind(gotoActionCb, _1),false));
     goto_server->start();
 
     dock_server.reset(
             new actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>(
-                nh, "/ropod/dock", boost::bind(dock_action_cb, _1),false));
+                nh, "/ropod/dock", boost::bind(dockActionCb, _1),false));
     dock_server->start();
 
-    /* nav_elevator_server.reset( */
-    /*         new actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>( */
-    /*             nh, "/ropod/take_elevator", boost::bind(nav_elevator_action_cb, _1),false)); */
-    /* nav_elevator_server->start(); */
+    nav_elevator_server.reset(
+            new actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>(
+                nh, "/ropod/take_elevator", boost::bind(navElevatorActionCb, _1),false));
+    nav_elevator_server->start();
 
     ros::spin();
     return 0;
 }
-/* void waitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     ropod_ros_msgs::TaskProgressELEVATOR out_msg; */
-/*     out_msg.action_id = msg->action_id; */
-/*     out_msg.action_type = msg->type; */
-/*     out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION; */
-/*     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::WAITING; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-
-/*     ROS_INFO_STREAM("Action type: WAIT_FOR_ELEVATOR"); */
-/*     ROS_INFO_STREAM("Succeed in reaching waiting waypoint? (y/n)"); */
-/*     char c; */
-/*     std::cin >> c; */
-/*     if (c != 'y' && c != 'Y') */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE; */
-/*         ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed"); */
-/*     } */
-/*     else */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::WAITING_POINT_REACHED; */
-/*     } */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-
-/*     ROS_INFO_STREAM("Action type: WAIT_FOR_ELEVATOR"); */
-/*     ROS_INFO_STREAM("Did door open in time? (y/n)"); */
-/*     std::cin >> c; */
-/*     if (c != 'y' && c != 'Y') */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_WAIT_TIMEOUT; */
-/*         ROS_INFO_STREAM("WAIT_FOR_ELEVATOR failed"); */
-/*     } */
-/*     else */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::DOOR_OPENED; */
-/*     } */
-
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-/* } */
-
-/* void enterElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     ropod_ros_msgs::TaskProgressELEVATOR out_msg; */
-/*     out_msg.action_id = msg->action_id; */
-/*     out_msg.action_type = msg->type; */
-/*     out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION; */
-/*     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::ENTERING; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-
-/*     ROS_INFO_STREAM("Action type: ENTER_ELEVATOR"); */
-/*     ROS_INFO_STREAM("Success? (y/n)"); */
-/*     char c; */
-/*     std::cin >> c; */
-/*     if (c != 'y' && c != 'Y') */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED; */
-/*         ROS_INFO_STREAM("ENTER_ELEVATOR failed"); */
-/*     } */
-/*     else */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::ENTERED_ELEVATOR; */
-/*     } */
-
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-/* } */
-
-/* void rideElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     ropod_ros_msgs::TaskProgressELEVATOR out_msg; */
-/*     out_msg.action_id = msg->action_id; */
-/*     out_msg.action_type = msg->type; */
-/*     out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION; */
-/*     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::DESTINATION_FLOOR_REACHED; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-/* } */
-
-/* void exitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     ropod_ros_msgs::TaskProgressELEVATOR out_msg; */
-/*     out_msg.action_id = msg->action_id; */
-/*     out_msg.action_type = msg->type; */
-/*     out_msg.status.module_code = ropod_ros_msgs::Status::ELEVATOR_ACTION; */
-/*     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::EXITING; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::EXITED_ELEVATOR; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED; */
-/*     elevator_progress_pub.publish(out_msg); */
-/*     ros::Duration(1.0).sleep(); */
-/* } */
-
-/* void elevatorRequestCallback(const ropod_ros_msgs::ElevatorRequest::Ptr &msg) */
-/* { */
-/*     // publish reply */
-/*     ropod_ros_msgs::ElevatorRequestReply out_msg; */
-/*     out_msg.query_id = msg->query_id; */
-/*     out_msg.query_success = true; */
-/*     out_msg.elevator_id = 0; */
-/*     out_msg.elevator_door_id = 1; */
-/*     elevator_reply_pub.publish(out_msg); */
-/* } */
