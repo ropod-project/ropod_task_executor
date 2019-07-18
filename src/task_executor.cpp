@@ -6,6 +6,8 @@
 #include <bsoncxx/types.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 
+typedef actionlib::SimpleActionClient<ropod_ros_msgs::GoToAction> Client;
+
 void printTask(ropod_ros_msgs::Task::Ptr &msg);
 
 TaskExecutor::TaskExecutor() :
@@ -21,6 +23,9 @@ TaskExecutor::TaskExecutor() :
     received_task(false),
     action_ongoing(false),
     action_failed(false),
+    goto_client("/ropod/goto", true),
+    dock_client("/ropod/dock", true),
+    nav_elevator_client("/ropod/take_elevator", true),
     current_action_index(-1)
 {
 }
@@ -36,13 +41,13 @@ std::string TaskExecutor::init()
 
     task_sub = nh.subscribe("task", 1, &TaskExecutor::taskCallback, this);
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
-    action_goto_pub = nh.advertise<ropod_ros_msgs::Action>("GOTO", 1);
-    action_dock_pub = nh.advertise<ropod_ros_msgs::Action>("DOCK", 1);
-    action_undock_pub = nh.advertise<ropod_ros_msgs::Action>("UNDOCK", 1);
-    action_wait_for_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("WAIT_FOR_ELEVATOR", 1);
-    action_enter_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("ENTER_ELEVATOR", 1);
-    action_ride_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("RIDE_ELEVATOR", 1);
-    action_exit_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("EXIT_ELEVATOR", 1);
+
+    ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
+    goto_client.waitForServer();
+    /* ROS_INFO_STREAM("[task_executor] waiting for dock action server..."); */
+    /* dock_client.waitForServer(); */
+    /* ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server..."); */
+    /* nav_elevator_client.waitForServer(); */
 
     elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
     elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
@@ -50,7 +55,7 @@ std::string TaskExecutor::init()
     task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
     task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
     task_progress_elevator_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator_out", 1);
-    task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this);
+    /* task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this); */
     task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this);
     task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this);
 
@@ -120,47 +125,53 @@ std::string TaskExecutor::running()
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
         {
-            action_goto_pub.publish(action);
+            ropod_ros_msgs::GoToGoal goto_goal; 
+            goto_goal.action = action;
+            goto_client.sendGoal(
+                    goto_goal,
+                    boost::bind(&TaskExecutor::GoToResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::GoToFeedbackCb, this, _1));
             current_action_type = GOTO;
         }
-        else if (action.type == "DOCK")
-        {
-            action_dock_pub.publish(action);
-            current_action_type = DOCK;
-        }
-        else if (action.type == "UNDOCK")
-        {
-            action_undock_pub.publish(action);
-            current_action_type = UNDOCK;
-        }
-        else if (action.type == "REQUEST_ELEVATOR")
-        {
-            current_action_type = REQUEST_ELEVATOR;
-            elevator_reply = nullptr;
-            requestElevator(action, current_task->task_id, current_task->load_type);
-        }
-        else if (action.type == "WAIT_FOR_ELEVATOR")
-        {
-            action.elevator.elevator_id = elevator_reply->elevator_id;
-            action.elevator.door_id = elevator_reply->elevator_door_id;
-            action_wait_for_elevator_pub.publish(action);
-            current_action_type = WAIT_FOR_ELEVATOR;
-        }
-        else if (action.type == "ENTER_ELEVATOR")
-        {
-            action_enter_elevator_pub.publish(action);
-            current_action_type = ENTER_ELEVATOR;
-        }
-        else if (action.type == "RIDE_ELEVATOR")
-        {
-            action_ride_elevator_pub.publish(action);
-            current_action_type = RIDE_ELEVATOR;
-        }
-        else if (action.type == "EXIT_ELEVATOR")
-        {
-            action_exit_elevator_pub.publish(action);
-            current_action_type = EXIT_ELEVATOR;
-        }
+        /* else if (action.type == "DOCK") */
+        /* { */
+        /*     action_dock_pub.publish(action); */
+        /*     current_action_type = DOCK; */
+        /* } */
+        /* else if (action.type == "UNDOCK") */
+        /* { */
+        /*     action_undock_pub.publish(action); */
+        /*     current_action_type = UNDOCK; */
+        /* } */
+        /* else if (action.type == "REQUEST_ELEVATOR") */
+        /* { */
+        /*     current_action_type = REQUEST_ELEVATOR; */
+        /*     elevator_reply = nullptr; */
+        /*     requestElevator(action, current_task->task_id, current_task->load_type); */
+        /* } */
+        /* else if (action.type == "WAIT_FOR_ELEVATOR") */
+        /* { */
+        /*     action.elevator.elevator_id = elevator_reply->elevator_id; */
+        /*     action.elevator.door_id = elevator_reply->elevator_door_id; */
+        /*     action_wait_for_elevator_pub.publish(action); */
+        /*     current_action_type = WAIT_FOR_ELEVATOR; */
+        /* } */
+        /* else if (action.type == "ENTER_ELEVATOR") */
+        /* { */
+        /*     action_enter_elevator_pub.publish(action); */
+        /*     current_action_type = ENTER_ELEVATOR; */
+        /* } */
+        /* else if (action.type == "RIDE_ELEVATOR") */
+        /* { */
+        /*     action_ride_elevator_pub.publish(action); */
+        /*     current_action_type = RIDE_ELEVATOR; */
+        /* } */
+        /* else if (action.type == "EXIT_ELEVATOR") */
+        /* { */
+        /*     action_exit_elevator_pub.publish(action); */
+        /*     current_action_type = EXIT_ELEVATOR; */
+        /* } */
         else
         {
             ROS_ERROR_STREAM("Got invalid action: " << action.type);
@@ -221,7 +232,8 @@ std::string TaskExecutor::recovering()
 {
     if (state == EXECUTING_ACTION)
     {
-        bool success = recoverFailedAction();
+        /* bool success = recoverFailedAction(); */
+        bool success = true;
         if (success)
         {
             action_failed = false;
@@ -325,6 +337,7 @@ void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const s
 
 void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 {
+    ROS_INFO_STREAM(*msg);
     if (state != INIT)
     {
         if (msg->task_id != current_task->task_id)
@@ -345,19 +358,26 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     }
 }
 
+void TaskExecutor::GoToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result)
+{
+    /* result = *result; */
+    ROS_INFO_STREAM(*result);
+}
+
 void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
 {
     elevator_reply = msg;
 }
 
-void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
+void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback)
 {
-    msg->task_id = current_task->task_id;
-    if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
-    		(msg->status.status_code == ropod_ros_msgs::Status::FAILED ||
-             msg->status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
+    ropod_ros_msgs::TaskProgressGOTO msg = feedback->feedback;
+    msg.task_id = current_task->task_id;
+    if (msg.status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
+    		(msg.status.status_code == ropod_ros_msgs::Status::FAILED ||
+             msg.status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
     {
-        ROS_ERROR_STREAM("GOTO action failed: " << msg->action_id  << " at area: " << msg->area_name);
+        ROS_ERROR_STREAM("GOTO action failed: " << msg.action_id  << " at area: " << msg.area_name);
         goto_progress_msg = msg;
         action_failed = true;
         return;
@@ -367,20 +387,20 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
     goto_recovery.setSubActionSuccessful();
     if (last_action)
     {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-        msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+        msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+        msg.task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
     }
     else
     {
-        msg->task_status.status_code = task_status.status_code;
+        msg.task_status.status_code = task_status.status_code;
     }
 
-    task_progress_goto_pub.publish(*msg);
+    task_progress_goto_pub.publish(msg);
 
-    if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
-        msg->sequenceNumber == msg->totalNumber &&
-        msg->action_id == current_action_id)
+    if (msg.status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
+    	msg.status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
+        msg.sequenceNumber == msg.totalNumber &&
+        msg.action_id == current_action_id)
     {
         action_ongoing = false;
     }
@@ -467,61 +487,61 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
     //TODO we have now more cases
 }
 
-bool TaskExecutor::recoverFailedAction()
-{
-    if (current_action_type == GOTO)
-    {
-        goto_recovery.setProgressMessage(goto_progress_msg);
-        bool success = goto_recovery.recover();
-        if (success)
-        {
-            std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions();
-            if (!recovery_actions.empty())
-            {
-                action_goto_pub.publish(recovery_actions[0]);
-            }
-        }
-        return success;
-    }
-    else if (current_action_type == DOCK)
-    {
-        dock_recovery.setProgressMessage(dock_progress_msg);
-        bool success = dock_recovery.recover();
-        if (success)
-        {
-            std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions();
-            if (!recovery_actions.empty())
-            {
-                action_dock_pub.publish(recovery_actions[0]);
-            }
-        }
-        return success;
-    }
-    else if (current_action_type == WAIT_FOR_ELEVATOR ||
-             current_action_type == ENTER_ELEVATOR ||
-             current_action_type == RIDE_ELEVATOR ||
-             current_action_type == EXIT_ELEVATOR)
-    {
-        elevator_recovery.setProgressMessage(elevator_progress_msg);
-        bool success = elevator_recovery.recover();
-        if (success)
-        {
-            std::vector<ropod_ros_msgs::Action> recovery_actions = elevator_recovery.getRecoveryActions();
-            if (!recovery_actions.empty())
-            {
-                auto insert_it = current_task->robot_actions.begin() + current_action_index;
-                // delete current action
-                current_task->robot_actions.erase(insert_it);
-                // insert recovery actions at current location
-                current_task->robot_actions.insert(insert_it, recovery_actions.begin(), recovery_actions.end());
-                // change state to DISPATCHING so that the first recovery action will be executed
-                // TODO: maybe it's not a good idea to change the state here..
-                state = DISPATCHING_ACTION;
-            }
-        }
-        return success;
-    }
-}
+/* bool TaskExecutor::recoverFailedAction() */
+/* { */
+/*     if (current_action_type == GOTO) */
+/*     { */
+/*         goto_recovery.setProgressMessage(goto_progress_msg); */
+/*         bool success = goto_recovery.recover(); */
+/*         if (success) */
+/*         { */
+/*             std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions(); */
+/*             if (!recovery_actions.empty()) */
+/*             { */
+/*                 action_goto_pub.publish(recovery_actions[0]); */
+/*             } */
+/*         } */
+/*         return success; */
+/*     } */
+/*     else if (current_action_type == DOCK) */
+/*     { */
+/*         dock_recovery.setProgressMessage(dock_progress_msg); */
+/*         bool success = dock_recovery.recover(); */
+/*         if (success) */
+/*         { */
+/*             std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions(); */
+/*             if (!recovery_actions.empty()) */
+/*             { */
+/*                 action_dock_pub.publish(recovery_actions[0]); */
+/*             } */
+/*         } */
+/*         return success; */
+/*     } */
+/*     else if (current_action_type == WAIT_FOR_ELEVATOR || */
+/*              current_action_type == ENTER_ELEVATOR || */
+/*              current_action_type == RIDE_ELEVATOR || */
+/*              current_action_type == EXIT_ELEVATOR) */
+/*     { */
+/*         elevator_recovery.setProgressMessage(elevator_progress_msg); */
+/*         bool success = elevator_recovery.recover(); */
+/*         if (success) */
+/*         { */
+/*             std::vector<ropod_ros_msgs::Action> recovery_actions = elevator_recovery.getRecoveryActions(); */
+/*             if (!recovery_actions.empty()) */
+/*             { */
+/*                 auto insert_it = current_task->robot_actions.begin() + current_action_index; */
+/*                 // delete current action */
+/*                 current_task->robot_actions.erase(insert_it); */
+/*                 // insert recovery actions at current location */
+/*                 current_task->robot_actions.insert(insert_it, recovery_actions.begin(), recovery_actions.end()); */
+/*                 // change state to DISPATCHING so that the first recovery action will be executed */
+/*                 // TODO: maybe it's not a good idea to change the state here.. */
+/*                 state = DISPATCHING_ACTION; */
+/*             } */
+/*         } */
+/*         return success; */
+/*     } */
+/* } */
 
 void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
 {

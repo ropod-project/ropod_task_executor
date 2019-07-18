@@ -2,6 +2,7 @@
 #define TASK_EXECUTOR_H
 
 #include <ros/ros.h>
+#include <actionlib/client/simple_action_client.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
 #include <ropod_ros_msgs/TaskProgressDOCK.h>
@@ -11,6 +12,9 @@
 #include <ropod_ros_msgs/Waypoint.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
+#include <ropod_ros_msgs/GoToAction.h>
+#include <ropod_ros_msgs/NavElevatorAction.h>
+#include <ropod_ros_msgs/DockAction.h>
 
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
@@ -109,39 +113,19 @@ private:
     ros::Publisher task_feedback_pub;
 
     /**
-     * Publisher for sending go_to actions to navigation
+     * Action client for sending go_to actions to navigation
      */
-    ros::Publisher action_goto_pub;
+    actionlib::SimpleActionClient<ropod_ros_msgs::GoToAction> goto_client;
 
     /**
-     * Publisher for sending dock actions
+     * Action client for sending dock actions
      */
-    ros::Publisher action_dock_pub;
+    actionlib::SimpleActionClient<ropod_ros_msgs::DockAction> dock_client;
 
     /**
-     * Publisher for sending undock actions
+     * Action client for elevator waiting actions
      */
-    ros::Publisher action_undock_pub;
-
-    /**
-     * Publisher for elevator waiting actions
-     */
-    ros::Publisher action_wait_for_elevator_pub;
-
-    /**
-     * Publisher for sending enter elevator actions
-     */
-    ros::Publisher action_enter_elevator_pub;
-
-    /**
-     * Publisher for elevator riding actions
-     */
-    ros::Publisher action_ride_elevator_pub;
-
-    /**
-     * Publisher for sending exit elevator actions
-     */
-    ros::Publisher action_exit_elevator_pub;
+    actionlib::SimpleActionClient<ropod_ros_msgs::NavElevatorAction> nav_elevator_client;
 
     /**
      * Publisher for sending elevator requests
@@ -237,7 +221,7 @@ private:
     /**
      * Last GOTO progress message
      */
-    ropod_ros_msgs::TaskProgressGOTO::Ptr goto_progress_msg;
+    ropod_ros_msgs::TaskProgressGOTO goto_progress_msg;
 
     /**
      * Last DOCK progress message
@@ -248,6 +232,16 @@ private:
      * Last ELEVATOR progress message
      */
     ropod_ros_msgs::TaskProgressELEVATOR::Ptr elevator_progress_msg;
+
+    /**
+     * callback for result of goto action server request
+     */
+    void GoToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result);
+
+    /**
+     * callback for feedback of goto action server request
+     */
+    void GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback);
 
     /**
      * callback for reply to elevator request
@@ -262,7 +256,7 @@ private:
     /**
      * Subscriber callback for task progress messages for GOTO actions
      */
-    void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+    /* void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg); */
 
     /**
      * Subscriber callback for task progress messages for DOCK actions

@@ -2,6 +2,9 @@
 <launch>
     <node pkg="ropod_task_executor" type="ropod_task_executor" name="ropod_task_executor" output="screen">
         <remap from="~task" to="/ropod_com_mediator/task" />
+        <remap from="~goto_action" to="/ropod/goto" />
+        <remap from="~dock_action" to="/ropod/dock" />
+        <remap from="~nav_elevator_action" to="/ropod/take_elevator" />
         <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
         <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
         <remap from="~progress_goto_in" to="/task_progress/goto" />
