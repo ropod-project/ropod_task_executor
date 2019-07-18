@@ -11,26 +11,164 @@
 #include <ropod_ros_msgs/DockAction.h>
 #include <stdlib.h>
 
-ros::Publisher goto_progress_pub;
-ros::Publisher dock_progress_pub;
-ros::Publisher elevator_progress_pub;
 ros::Publisher elevator_reply_pub;
 bool ask_for_failure = true;
 std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::GoToAction>> goto_server;
+std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>> dock_server;
+/* std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>> nav_elevator_server; */
 
+
+bool dummy_goto_handler(const ropod_ros_msgs::Action msg)
+{
+    int num_areas = msg.areas.size();
+    ROS_INFO_STREAM("Received action: " << msg.action_id << " with " << num_areas << " areas");
+    ropod_ros_msgs::TaskProgressGOTO out_msg;
+    int num_waypoints = 0;
+    for (int i = 0; i < num_areas; i++)
+    {
+        for (int j = 0; j < msg.areas[i].sub_areas.size(); j++)
+        {
+            num_waypoints++;
+        }
+    }
+
+    int sequenceNumber = 0;
+    bool failed = false;
+    for (int i = 0; i < num_areas; i++)
+    {
+        for (int j = 0; j < msg.areas[i].sub_areas.size(); j++)
+        {
+            sequenceNumber++;
+
+            out_msg.action_id = msg.action_id;
+            out_msg.action_type = msg.type;
+            out_msg.area_name = msg.areas[i].name;
+            out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+            out_msg.status.module_code = ropod_ros_msgs::Status::ROUTE_NAVIGATION;
+            out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED;
+            out_msg.subarea_id = msg.areas[i].sub_areas[j].id;
+            out_msg.subarea_name = msg.areas[i].sub_areas[j].name;
+            if (ask_for_failure)
+            {
+                ROS_INFO_STREAM("Action type: GOTO, Area: " << out_msg.area_name << " Subarea: " << out_msg.subarea_name << " (" << out_msg.subarea_id << ")");
+                ROS_INFO_STREAM("Success? (y/n, or Y to succeed remaining)");
+                char c;
+                std::cin >> c;
+                if (c != 'y' && c != 'Y')
+                {
+                    out_msg.status.status_code = ropod_ros_msgs::Status::FAILED;
+                    // also sand back GOAL_NOT_REACHABLE ?
+                    failed = true;
+                    ROS_INFO_STREAM("sub area failed: " << out_msg.subarea_name);
+                }
+                if (c == 'Y')
+                {
+                    ask_for_failure = false;
+                }
+            }
+            out_msg.sequenceNumber = sequenceNumber;
+            out_msg.totalNumber = num_waypoints;
+            ropod_ros_msgs::GoToFeedback goto_feedback;
+            goto_feedback.feedback = out_msg;
+            goto_server->publishFeedback(goto_feedback);
+            if (failed)
+            {
+                break;
+            }
+        }
+        if (failed)
+        {
+            break;
+        }
+    }
+    return !failed;
+}
+
+bool dummy_dock_handler(const ropod_ros_msgs::Action msg)
+{
+    ROS_INFO_STREAM("Received action: " << msg.action_id << " of type " << msg.type);
+    bool success = true;
+    ropod_ros_msgs::TaskProgressDOCK out_msg;
+    out_msg.action_id = msg.action_id;
+    out_msg.action_type = msg.type;
+    out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT;
+    out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION;
+    if (msg.type == "DOCK")
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED;
+    }
+    else
+    {
+        out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED;
+    }
+
+    ROS_INFO_STREAM("Action type: " << msg.type);
+    ROS_INFO_STREAM("Success? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c != 'y' && c != 'Y')
+    {
+        if (msg.type == "DOCK")
+        {
+            out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_FAILED;
+        }
+        else
+        {
+            out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_FAILED;
+        }
+        ROS_INFO_STREAM(msg.type << " failed");
+        success = false;
+    }
+    ropod_ros_msgs::DockFeedback dock_feedback;
+    dock_feedback.feedback = out_msg;
+    dock_server->publishFeedback(dock_feedback);
+    return success;
+}
 
 void goto_action_cb(const ropod_ros_msgs::GoToGoalConstPtr& goal)
 {
+    bool success = dummy_goto_handler(goal->action);
+    ROS_INFO_STREAM("Finished executing action\n");
     ropod_ros_msgs::GoToResult goto_result;
-    for (int i = 0; i < goal->action.areas.size(); i++)
+    goto_result.success = success;
+    if (goto_result.success)
     {
-        ropod_ros_msgs::GoToFeedback goto_feedback;
-        goto_feedback.feedback.area_name = goal->action.areas[i].name;
-        goto_server->publishFeedback(goto_feedback);
-        ros::Duration(0.5).sleep(); // mock processing of the action request
+        goto_server->setSucceeded(goto_result);
     }
-    goto_server->setSucceeded(goto_result);
+    else
+    {
+        goto_server->setAborted(goto_result);
+    }
 }
+
+void dock_action_cb(const ropod_ros_msgs::DockGoalConstPtr& goal)
+{
+    bool success = dummy_dock_handler(goal->action);
+    ROS_INFO_STREAM("Finished executing action\n");
+    ropod_ros_msgs::DockResult dock_result;
+    dock_result.success = success;
+    if (dock_result.success)
+    {
+        dock_server->setSucceeded(dock_result);
+    }
+    else
+    {
+        dock_server->setAborted(dock_result);
+    }
+}
+
+/* void goto_action_cb(const ropod_ros_msgs::GoToGoalConstPtr& goal) */
+/* { */
+/*     ropod_ros_msgs::GoToResult goto_result; */
+/*     for (int i = 0; i < goal->action.areas.size(); i++) */
+/*     { */
+/*         ropod_ros_msgs::GoToFeedback goto_feedback; */
+/*         goto_feedback.feedback.area_name = goal->action.areas[i].name; */
+/*         goto_server->publishFeedback(goto_feedback); */
+/*         ros::Duration(0.5).sleep(); // mock processing of the action request */
+/*     } */
+/*     goto_server->setSucceeded(goto_result); */
+/* } */
 
 int main(int argc, char *argv[])
 {
@@ -49,120 +187,19 @@ int main(int argc, char *argv[])
                 nh, "/ropod/goto", boost::bind(goto_action_cb, _1),false));
     goto_server->start();
 
-    /* goto_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto", 1); */
-    /* dock_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock", 1); */
-    /* elevator_progress_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator", 1); */
-    /* elevator_reply_pub = nh.advertise<ropod_ros_msgs::ElevatorRequestReply>("elevator_reply", 1); */
+    dock_server.reset(
+            new actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>(
+                nh, "/ropod/dock", boost::bind(dock_action_cb, _1),false));
+    dock_server->start();
+
+    /* nav_elevator_server.reset( */
+    /*         new actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>( */
+    /*             nh, "/ropod/take_elevator", boost::bind(nav_elevator_action_cb, _1),false)); */
+    /* nav_elevator_server->start(); */
+
     ros::spin();
     return 0;
 }
-/* void DOCKCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     ROS_INFO_STREAM("Received action: " << msg->action_id << " of type " << msg->type); */
-/*     ropod_ros_msgs::TaskProgressDOCK out_msg; */
-/*     out_msg.action_id = msg->action_id; */
-/*     out_msg.action_type = msg->type; */
-/*     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-/*     out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION; */
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED; */
-
-/*     ROS_INFO_STREAM("Action type: DOCK"); */
-/*     ROS_INFO_STREAM("Success? (y/n)"); */
-/*     char c; */
-/*     std::cin >> c; */
-/*     if (c != 'y' && c != 'Y') */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::DOCKING_SEQUENCE_FAILED; */
-/*         ROS_INFO_STREAM("DOCK failed"); */
-/*     } */
-/*     dock_progress_pub.publish(out_msg); */
-/* } */
-
-/* void UNDOCKCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     ROS_INFO_STREAM("Received action: " << msg->action_id << " of type " << msg->type); */
-/*     ropod_ros_msgs::TaskProgressDOCK out_msg; */
-/*     out_msg.action_id = msg->action_id; */
-/*     out_msg.action_type = msg->type; */
-/*     out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-/*     out_msg.status.module_code = ropod_ros_msgs::Status::MOBIDIK_COLLECTION; */
-/*     out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED; */
-
-/*     ROS_INFO_STREAM("Action type: UNDOCK"); */
-/*     ROS_INFO_STREAM("Success? (y/n)"); */
-/*     char c; */
-/*     std::cin >> c; */
-/*     if (c != 'y' && c != 'Y') */
-/*     { */
-/*         out_msg.status.status_code = ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_FAILED; */
-/*         ROS_INFO_STREAM("UNDOCK failed"); */
-/*     } */
-
-/*     dock_progress_pub.publish(out_msg); */
-/* } */
-/* void GOTOCallback(const ropod_ros_msgs::Action::Ptr &msg) */
-/* { */
-/*     int num_areas = msg->areas.size(); */
-/*     ROS_INFO_STREAM("Received action: " << msg->action_id << " with " << num_areas << " areas"); */
-/*     ropod_ros_msgs::TaskProgressGOTO out_msg; */
-/*     int num_waypoints = 0; */
-/*     for (int i = 0; i < num_areas; i++) */
-/*     { */
-/*         for (int j = 0; j < msg->areas[i].sub_areas.size(); j++) */
-/*         { */
-/*             num_waypoints++; */
-/*         } */
-/*     } */
-
-/*     int sequenceNumber = 0; */
-/*     bool failed = false; */
-/*     for (int i = 0; i < num_areas; i++) */
-/*     { */
-/*         for (int j = 0; j < msg->areas[i].sub_areas.size(); j++) */
-/*         { */
-/*             sequenceNumber++; */
-
-/*             out_msg.action_id = msg->action_id; */
-/*             out_msg.action_type = msg->type; */
-/*             out_msg.area_name = msg->areas[i].name; */
-/*             out_msg.status.domain = ropod_ros_msgs::Status::COMPONENT; */
-/*             out_msg.status.module_code = ropod_ros_msgs::Status::ROUTE_NAVIGATION; */
-/*             out_msg.status.status_code = ropod_ros_msgs::Status::GOAL_REACHED; */
-/*             out_msg.subarea_id = msg->areas[i].sub_areas[j].id; */
-/*             out_msg.subarea_name = msg->areas[i].sub_areas[j].name; */
-/*             if (ask_for_failure) */
-/*             { */
-/*                 ROS_INFO_STREAM("Action type: GOTO, Area: " << out_msg.area_name << " Subarea: " << out_msg.subarea_name << " (" << out_msg.subarea_id << ")"); */
-/*                 ROS_INFO_STREAM("Success? (y/n, or Y to succeed remaining)"); */
-/*                 char c; */
-/*                 std::cin >> c; */
-/*                 if (c != 'y' && c != 'Y') */
-/*                 { */
-/*                     out_msg.status.status_code = ropod_ros_msgs::Status::FAILED; */
-/*                     // also sand back GOAL_NOT_REACHABLE ? */
-/*                     failed = true; */
-/*                     ROS_INFO_STREAM("sub area failed: " << out_msg.subarea_name); */
-/*                 } */
-/*                 if (c == 'Y') */
-/*                 { */
-/*                     ask_for_failure = false; */
-/*                 } */
-/*             } */
-/*             out_msg.sequenceNumber = sequenceNumber; */
-/*             out_msg.totalNumber = num_waypoints; */
-/*             goto_progress_pub.publish(out_msg); */
-/*             if (failed) */
-/*             { */
-/*                 break; */
-/*             } */
-/*         } */
-/*         if (failed) */
-/*         { */
-/*             break; */
-/*         } */
-/*     } */
-/* } */
-
 /* void waitElevatorCallback(const ropod_ros_msgs::Action::Ptr &msg) */
 /* { */
 /*     ropod_ros_msgs::TaskProgressELEVATOR out_msg; */
