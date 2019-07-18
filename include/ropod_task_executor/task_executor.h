@@ -226,7 +226,7 @@ private:
     /**
      * Last DOCK progress message
      */
-    ropod_ros_msgs::TaskProgressDOCK::Ptr dock_progress_msg;
+    ropod_ros_msgs::TaskProgressDOCK dock_progress_msg;
 
     /**
      * Last ELEVATOR progress message
@@ -242,6 +242,16 @@ private:
      * callback for feedback of goto action server request
      */
     void GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback);
+
+    /**
+     * callback for result of dock action server request
+     */
+    void DockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result);
+
+    /**
+     * callback for feedback of dock action server request
+     */
+    void DockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback);
 
     /**
      * callback for reply to elevator request
@@ -261,7 +271,7 @@ private:
     /**
      * Subscriber callback for task progress messages for DOCK actions
      */
-    void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
+    /*void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);*/
 
     /**
      * Subscriber callback for task progress messages for ENTER_ELEVATOR and EXIT_ELEVATOR actions

@@ -44,8 +44,8 @@ std::string TaskExecutor::init()
 
     ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
     goto_client.waitForServer();
-    /* ROS_INFO_STREAM("[task_executor] waiting for dock action server..."); */
-    /* dock_client.waitForServer(); */
+    ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
+    dock_client.waitForServer();
     /* ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server..."); */
     /* nav_elevator_client.waitForServer(); */
 
@@ -56,7 +56,7 @@ std::string TaskExecutor::init()
     task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
     task_progress_elevator_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator_out", 1);
     /* task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this); */
-    task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this);
+    /* task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this); */
     task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this);
 
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
@@ -134,16 +134,28 @@ std::string TaskExecutor::running()
                     boost::bind(&TaskExecutor::GoToFeedbackCb, this, _1));
             current_action_type = GOTO;
         }
-        /* else if (action.type == "DOCK") */
-        /* { */
-        /*     action_dock_pub.publish(action); */
-        /*     current_action_type = DOCK; */
-        /* } */
-        /* else if (action.type == "UNDOCK") */
-        /* { */
-        /*     action_undock_pub.publish(action); */
-        /*     current_action_type = UNDOCK; */
-        /* } */
+        else if (action.type == "DOCK")
+        {
+            ropod_ros_msgs::DockGoal dock_goal; 
+            dock_goal.action = action;
+            dock_client.sendGoal(
+                    dock_goal,
+                    boost::bind(&TaskExecutor::DockResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::DockFeedbackCb, this, _1));
+            current_action_type = DOCK;
+        }
+        else if (action.type == "UNDOCK")
+        {
+            ropod_ros_msgs::DockGoal dock_goal; 
+            dock_goal.action = action;
+            dock_client.sendGoal(
+                    dock_goal,
+                    boost::bind(&TaskExecutor::DockResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::DockFeedbackCb, this, _1));
+            current_action_type = UNDOCK;
+        }
         /* else if (action.type == "REQUEST_ELEVATOR") */
         /* { */
         /*     current_action_type = REQUEST_ELEVATOR; */
@@ -335,6 +347,11 @@ void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const s
     elevator_request_pub.publish(er);
 }
 
+void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
+{
+    elevator_reply = msg;
+}
+
 void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 {
     ROS_INFO_STREAM(*msg);
@@ -360,13 +377,8 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 
 void TaskExecutor::GoToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result)
 {
-    /* result = *result; */
     ROS_INFO_STREAM(*result);
-}
-
-void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
-{
-    elevator_reply = msg;
+    action_ongoing = false;
 }
 
 void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback)
@@ -396,14 +408,42 @@ void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& fe
     }
 
     task_progress_goto_pub.publish(msg);
+}
 
-    if (msg.status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
-    	msg.status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
-        msg.sequenceNumber == msg.totalNumber &&
-        msg.action_id == current_action_id)
+void TaskExecutor::DockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result)
+{
+    ROS_INFO_STREAM(*result);
+    action_ongoing = false;
+}
+
+void TaskExecutor::DockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback)
+{
+    ropod_ros_msgs::TaskProgressDOCK msg = feedback->feedback;
+    msg.task_id = current_task->task_id;
+    if (msg.status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+        (msg.status.status_code != ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
+         msg.status.status_code != ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
+         msg.status.status_code != ropod_ros_msgs::Status::SUCCEEDED))
     {
-        action_ongoing = false;
+        std::string action_type = (current_action_type == DOCK? "DOCK" : "UNDOCK");
+        ROS_ERROR_STREAM(action_type << " action failed: " << msg.action_id);
+        dock_progress_msg = msg;
+        action_failed = true;
+        return;
     }
+
+    if (last_action)
+    {
+        msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg.task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+    }
+    else
+    {
+        msg.task_status.status_code = task_status.status_code;
+    }
+
+    task_progress_dock_pub.publish(msg);
+    //TODO we have now more cases
 }
 
 void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg)
@@ -443,48 +483,6 @@ void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgre
     {
         action_ongoing = false;
     }
-}
-
-void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
-{
-    msg->task_id = current_task->task_id;
-    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-        (msg->status.status_code != ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
-         msg->status.status_code != ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
-         msg->status.status_code != ropod_ros_msgs::Status::SUCCEEDED))
-    {
-        std::string action_type = (current_action_type == DOCK? "DOCK" : "UNDOCK");
-        ROS_ERROR_STREAM(action_type << " action failed: " << msg->action_id);
-        dock_progress_msg = msg;
-        action_failed = true;
-        return;
-    }
-
-    if (last_action)
-    {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
-    }
-    else
-    {
-        msg ->task_status.status_code = task_status.status_code;
-    }
-
-    task_progress_dock_pub.publish(*msg);
-
-    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
-        msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
-             msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    //TODO we have now more cases
 }
 
 /* bool TaskExecutor::recoverFailedAction() */
