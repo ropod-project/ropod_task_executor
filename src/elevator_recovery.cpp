@@ -12,7 +12,7 @@ ElevatorRecovery::~ElevatorRecovery()
 
 }
 
-void ElevatorRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg)
+void ElevatorRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressELEVATOR msg)
 {
     progress_msg = msg;
     received_progress_message = true;
@@ -20,7 +20,7 @@ void ElevatorRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressELEV
 
 bool ElevatorRecovery::retry()
 {
-    if (progress_msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED)
+    if (progress_msg.status.status_code == ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED)
     {
         ropod_ros_msgs::Action current_action = current_task->robot_actions[current_action_index];
         ropod_ros_msgs::Action exit_elevator_action;
@@ -81,5 +81,5 @@ bool ElevatorRecovery::replan()
 
 std::string ElevatorRecovery::getFailedActionId()
 {
-    return progress_msg->action_id;
+    return progress_msg.action_id;
 }
