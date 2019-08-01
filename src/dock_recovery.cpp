@@ -9,7 +9,7 @@ DOCKRecovery::~DOCKRecovery()
 
 }
 
-void DOCKRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+void DOCKRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK msg)
 {
     progress_msg = msg;
     received_progress_message = true;
@@ -37,5 +37,5 @@ bool DOCKRecovery::replan()
 
 std::string DOCKRecovery::getFailedActionId()
 {
-    return progress_msg->action_id;
+    return progress_msg.action_id;
 }

@@ -442,7 +442,14 @@ void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& fe
 void TaskExecutor::DockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result)
 {
     ROS_INFO_STREAM(*result);
-    action_ongoing = false;
+    if (result->success)
+    {
+        action_ongoing = false;
+    }
+    else
+    {
+        action_failed = true;
+    }
 }
 
 void TaskExecutor::DockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback)
@@ -534,20 +541,26 @@ bool TaskExecutor::recoverFailedAction()
         }
         return success;
     }
-    /* else if (current_action_type == DOCK) */
-    /* { */
-    /*     dock_recovery.setProgressMessage(dock_progress_msg); */
-    /*     bool success = dock_recovery.recover(); */
-    /*     if (success) */
-    /*     { */
-    /*         std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions(); */
-    /*         if (!recovery_actions.empty()) */
-    /*         { */
-    /*             action_dock_pub.publish(recovery_actions[0]); */
-    /*         } */
-    /*     } */
-    /*     return success; */
-    /* } */
+    else if (current_action_type == DOCK || current_action_type == UNDOCK)
+    {
+        dock_recovery.setProgressMessage(dock_progress_msg);
+        bool success = dock_recovery.recover();
+        if (success)
+        {
+            std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions();
+            if (!recovery_actions.empty())
+            {
+                ropod_ros_msgs::DockGoal dock_goal; 
+                dock_goal.action = recovery_actions[0];
+                dock_client.sendGoal(
+                        dock_goal,
+                        boost::bind(&TaskExecutor::DockResultCb, this, _1, _2),
+                        Client::SimpleActiveCallback(),
+                        boost::bind(&TaskExecutor::DockFeedbackCb, this, _1));
+                }
+        }
+        return success;
+    }
     /* else if (current_action_type == WAIT_FOR_ELEVATOR || */
     /*          current_action_type == ENTER_ELEVATOR || */
     /*          current_action_type == RIDE_ELEVATOR || */

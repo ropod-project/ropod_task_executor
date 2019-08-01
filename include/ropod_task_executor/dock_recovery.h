@@ -15,13 +15,13 @@ protected:
     bool replan();
     std::string getFailedActionId();
 
-    ropod_ros_msgs::TaskProgressDOCK::Ptr progress_msg;
+    ropod_ros_msgs::TaskProgressDOCK progress_msg;
 
 public:
     DOCKRecovery();
     virtual ~DOCKRecovery();
 
-    void setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);
+    void setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK msg);
 
 };
 
