@@ -268,8 +268,7 @@ std::string TaskExecutor::recovering()
 {
     if (state == EXECUTING_ACTION)
     {
-        /* bool success = recoverFailedAction(); */
-        bool success = true;
+        bool success = recoverFailedAction();
         if (success)
         {
             action_failed = false;
@@ -401,7 +400,14 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 void TaskExecutor::GoToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result)
 {
     ROS_INFO_STREAM(*result);
-    action_ongoing = false;
+    if (result->success)
+    {
+        action_ongoing = false;
+    }
+    else
+    {
+        action_failed = true;
+    }
 }
 
 void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback)
@@ -505,61 +511,68 @@ void TaskExecutor::NavElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedba
     task_progress_elevator_pub.publish(msg);
 }
 
-/* bool TaskExecutor::recoverFailedAction() */
-/* { */
-/*     if (current_action_type == GOTO) */
-/*     { */
-/*         goto_recovery.setProgressMessage(goto_progress_msg); */
-/*         bool success = goto_recovery.recover(); */
-/*         if (success) */
-/*         { */
-/*             std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions(); */
-/*             if (!recovery_actions.empty()) */
-/*             { */
-/*                 action_goto_pub.publish(recovery_actions[0]); */
-/*             } */
-/*         } */
-/*         return success; */
-/*     } */
-/*     else if (current_action_type == DOCK) */
-/*     { */
-/*         dock_recovery.setProgressMessage(dock_progress_msg); */
-/*         bool success = dock_recovery.recover(); */
-/*         if (success) */
-/*         { */
-/*             std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions(); */
-/*             if (!recovery_actions.empty()) */
-/*             { */
-/*                 action_dock_pub.publish(recovery_actions[0]); */
-/*             } */
-/*         } */
-/*         return success; */
-/*     } */
-/*     else if (current_action_type == WAIT_FOR_ELEVATOR || */
-/*              current_action_type == ENTER_ELEVATOR || */
-/*              current_action_type == RIDE_ELEVATOR || */
-/*              current_action_type == EXIT_ELEVATOR) */
-/*     { */
-/*         elevator_recovery.setProgressMessage(elevator_progress_msg); */
-/*         bool success = elevator_recovery.recover(); */
-/*         if (success) */
-/*         { */
-/*             std::vector<ropod_ros_msgs::Action> recovery_actions = elevator_recovery.getRecoveryActions(); */
-/*             if (!recovery_actions.empty()) */
-/*             { */
-/*                 auto insert_it = current_task->robot_actions.begin() + current_action_index; */
-/*                 // delete current action */
-/*                 current_task->robot_actions.erase(insert_it); */
-/*                 // insert recovery actions at current location */
-/*                 current_task->robot_actions.insert(insert_it, recovery_actions.begin(), recovery_actions.end()); */
-/*                 // change state to DISPATCHING so that the first recovery action will be executed */
-/*                 // TODO: maybe it's not a good idea to change the state here.. */
-/*                 state = DISPATCHING_ACTION; */
-/*             } */
-/*         } */
-/*         return success; */
-/*     } */
-/* } */
+bool TaskExecutor::recoverFailedAction()
+{
+    if (current_action_type == GOTO)
+    {
+        goto_recovery.setProgressMessage(goto_progress_msg);
+        bool success = goto_recovery.recover();
+        if (success)
+        {
+            std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions();
+            if (!recovery_actions.empty())
+            {
+                /* action_goto_pub.publish(recovery_actions[0]); */
+                ropod_ros_msgs::GoToGoal goto_goal; 
+                goto_goal.action = recovery_actions[0];
+                goto_client.sendGoal(
+                        goto_goal,
+                        boost::bind(&TaskExecutor::GoToResultCb, this, _1, _2),
+                        Client::SimpleActiveCallback(),
+                        boost::bind(&TaskExecutor::GoToFeedbackCb, this, _1));
+            }
+        }
+        return success;
+    }
+    /* else if (current_action_type == DOCK) */
+    /* { */
+    /*     dock_recovery.setProgressMessage(dock_progress_msg); */
+    /*     bool success = dock_recovery.recover(); */
+    /*     if (success) */
+    /*     { */
+    /*         std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions(); */
+    /*         if (!recovery_actions.empty()) */
+    /*         { */
+    /*             action_dock_pub.publish(recovery_actions[0]); */
+    /*         } */
+    /*     } */
+    /*     return success; */
+    /* } */
+    /* else if (current_action_type == WAIT_FOR_ELEVATOR || */
+    /*          current_action_type == ENTER_ELEVATOR || */
+    /*          current_action_type == RIDE_ELEVATOR || */
+    /*          current_action_type == EXIT_ELEVATOR) */
+    /* { */
+    /*     elevator_recovery.setProgressMessage(elevator_progress_msg); */
+    /*     bool success = elevator_recovery.recover(); */
+    /*     if (success) */
+    /*     { */
+    /*         std::vector<ropod_ros_msgs::Action> recovery_actions = elevator_recovery.getRecoveryActions(); */
+    /*         if (!recovery_actions.empty()) */
+    /*         { */
+    /*             auto insert_it = current_task->robot_actions.begin() + current_action_index; */
+    /*             // delete current action */
+    /*             current_task->robot_actions.erase(insert_it); */
+    /*             // insert recovery actions at current location */
+    /*             current_task->robot_actions.insert(insert_it, recovery_actions.begin(), recovery_actions.end()); */
+    /*             // change state to DISPATCHING so that the first recovery action will be executed */
+    /*             // TODO: maybe it's not a good idea to change the state here.. */
+    /*             state = DISPATCHING_ACTION; */
+    /*         } */
+    /*     } */
+    /*     return success; */
+    /* } */
+}
 
 void TaskExecutor::setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg)
 {

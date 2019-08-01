@@ -31,13 +31,13 @@ protected:
 
     actionlib::SimpleActionClient<ropod_ros_msgs::GetPathPlanAction> path_planner_client;
 
-    ropod_ros_msgs::TaskProgressGOTO::Ptr progress_msg;
+    ropod_ros_msgs::TaskProgressGOTO progress_msg;
 
 public:
     GOTORecovery();
     virtual ~GOTORecovery();
 
-    void setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+    void setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO msg);
     void setTaskDone();
     void setSubActionSuccessful();
 
