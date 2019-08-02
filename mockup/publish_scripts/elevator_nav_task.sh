@@ -10,8 +10,8 @@ robot_actions:
     execution_status: ''
     estimated_duration: 0.0
     elevator: 
-      elevator_id: -1
-      door_id: 0
+      elevator_id: 4
+      door_id: 88
   - 
     action_id: '4a15af55-47fa-43e5-ad75-58d138242ab4'
     type: 'WAIT_FOR_ELEVATOR'
@@ -21,6 +21,9 @@ robot_actions:
     goal_floor: 0
     execution_status: ''
     estimated_duration: 0.0
+    elevator: 
+      elevator_id: 4
+      door_id: 88
   - 
     action_id: '4a15af55-47fa-43e5-ad75-58d138242ab5'
     type: 'ENTER_ELEVATOR'
@@ -30,6 +33,9 @@ robot_actions:
     goal_floor: 0
     execution_status: ''
     estimated_duration: 0.0
+    elevator: 
+      elevator_id: 4
+      door_id: 88
   - 
     action_id: '4a15af55-47fa-43e5-ad75-58d138242ab6'
     type: 'RIDE_ELEVATOR'
@@ -39,15 +45,27 @@ robot_actions:
     goal_floor: 0
     execution_status: ''
     estimated_duration: 0.0
+    elevator: 
+      elevator_id: 4
+      door_id: 88
   - 
     action_id: '4a15af55-47fa-43e5-ad75-58d138242ab7'
     type: 'EXIT_ELEVATOR'
-    areas: []
+    areas: 
+      - 
+        id: '60'
+        name: 'BRSU_C_L0_C9_LA2'
+        type: 'local_area'
+        floor_number: -1
+        sub_areas: []
     sub_areas: []
     start_floor: 0
     goal_floor: 0
     execution_status: ''
     estimated_duration: 0.0
+    elevator: 
+      elevator_id: 4
+      door_id: 88
 load_type: ''
 load_id: ''
 team_robot_ids: [ropod_001]

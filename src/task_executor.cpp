@@ -23,9 +23,9 @@ TaskExecutor::TaskExecutor() :
     received_task(false),
     action_ongoing(false),
     action_failed(false),
-    goto_client("/ropod/goto", true),
-    dock_client("/ropod/dock", true),
-    nav_elevator_client("/ropod/take_elevator", true),
+    goto_client(nh, "goto_action", true),
+    dock_client(nh, "dock_action", true),
+    nav_elevator_client(nh, "nav_elevator_action", true),
     current_action_index(-1)
 {
 }
