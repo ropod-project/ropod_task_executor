@@ -21,7 +21,7 @@ public:
     DOCKRecovery();
     virtual ~DOCKRecovery();
 
-    void setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK msg);
+    void setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK &msg);
 
 };
 

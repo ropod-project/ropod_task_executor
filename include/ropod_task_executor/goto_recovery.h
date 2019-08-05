@@ -37,7 +37,7 @@ public:
     GOTORecovery();
     virtual ~GOTORecovery();
 
-    void setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO msg);
+    void setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO &msg);
     void setTaskDone();
     void setSubActionSuccessful();
 

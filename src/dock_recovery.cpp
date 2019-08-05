@@ -9,7 +9,7 @@ DOCKRecovery::~DOCKRecovery()
 
 }
 
-void DOCKRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK msg)
+void DOCKRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressDOCK &msg)
 {
     progress_msg = msg;
     received_progress_message = true;

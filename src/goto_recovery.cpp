@@ -9,7 +9,7 @@ GOTORecovery::~GOTORecovery()
 
 }
 
-void GOTORecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO msg)
+void GOTORecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO &msg)
 {
     progress_msg = msg;
     received_progress_message = true;

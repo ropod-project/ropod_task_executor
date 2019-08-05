@@ -12,7 +12,7 @@ ElevatorRecovery::~ElevatorRecovery()
 
 }
 
-void ElevatorRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressELEVATOR msg)
+void ElevatorRecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressELEVATOR &msg)
 {
     progress_msg = msg;
     received_progress_message = true;

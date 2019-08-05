@@ -21,7 +21,7 @@ public:
     ElevatorRecovery();
     virtual ~ElevatorRecovery();
 
-    void setProgressMessage(const ropod_ros_msgs::TaskProgressELEVATOR msg);
+    void setProgressMessage(const ropod_ros_msgs::TaskProgressELEVATOR &msg);
 
 };
 
