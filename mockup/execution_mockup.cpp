@@ -342,20 +342,36 @@ int main(int argc, char *argv[])
     ros::Subscriber sub_elev_req = nh.subscribe("elevator_request", 1, elevatorRequestCallback);
     elevator_reply_pub = nh.advertise<ropod_ros_msgs::ElevatorRequestReply>("elevator_reply", 1);
 
-    goto_server.reset(
-            new actionlib::SimpleActionServer<ropod_ros_msgs::GoToAction>(
-                nh, "/ropod/goto", boost::bind(gotoActionCb, _1),false));
-    goto_server->start();
+    ROS_INFO_STREAM("Do you want to start goto action server? (y/n)");
+    char c;
+    std::cin >> c;
+    if (c == 'y' || c == 'Y')
+    {
+        goto_server.reset(
+                new actionlib::SimpleActionServer<ropod_ros_msgs::GoToAction>(
+                    nh, "/ropod/goto", boost::bind(gotoActionCb, _1),false));
+        goto_server->start();
+    }
 
-    dock_server.reset(
-            new actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>(
-                nh, "/collect_cart", boost::bind(dockActionCb, _1),false));
-    dock_server->start();
+    ROS_INFO_STREAM("Do you want to start dock action server? (y/n)");
+    std::cin >> c;
+    if (c == 'y' || c == 'Y')
+    {
+        dock_server.reset(
+                new actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>(
+                    nh, "/collect_cart", boost::bind(dockActionCb, _1),false));
+        dock_server->start();
+    }
 
-    nav_elevator_server.reset(
-            new actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>(
-                nh, "/ropod/take_elevator", boost::bind(navElevatorActionCb, _1),false));
-    nav_elevator_server->start();
+    ROS_INFO_STREAM("Do you want to start elevator nav action server? (y/n)");
+    std::cin >> c;
+    if (c == 'y' || c == 'Y')
+    {
+        nav_elevator_server.reset(
+                new actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>(
+                    nh, "/ropod/take_elevator", boost::bind(navElevatorActionCb, _1),false));
+        nav_elevator_server->start();
+    }
 
     ros::spin();
     return 0;
