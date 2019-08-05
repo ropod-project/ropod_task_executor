@@ -43,11 +43,24 @@ std::string TaskExecutor::init()
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
 
     ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
-    goto_client.waitForServer();
+    if (!goto_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to goto action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
     ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
-    dock_client.waitForServer();
+    if (!dock_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to dock action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
     ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
-    nav_elevator_client.waitForServer();
+    if (!nav_elevator_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to elevator nav action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
+    ROS_INFO_STREAM("[task_executor] Connected to all servers successfully.");
 
     elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
     elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
