@@ -9,7 +9,7 @@ GOTORecovery::~GOTORecovery()
 
 }
 
-void GOTORecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
+void GOTORecovery::setProgressMessage(const ropod_ros_msgs::TaskProgressGOTO &msg)
 {
     progress_msg = msg;
     received_progress_message = true;
@@ -41,7 +41,7 @@ bool GOTORecovery::retry()
         bool found = false;
         for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
         {
-            if (recovery_action.areas[i].sub_areas[j].name == progress_msg->subarea_name)
+            if (recovery_action.areas[i].sub_areas[j].name == progress_msg.subarea_name)
             {
                 failed_subarea_index = j;
                 found = true;
@@ -55,18 +55,18 @@ bool GOTORecovery::retry()
     }
     if (failed_area_index != -1 && failed_subarea_index != -1)
     {
-        auto area_it = goto_recovery_index.find(progress_msg->subarea_name);
+        auto area_it = goto_recovery_index.find(progress_msg.subarea_name);
         // first time we are attempting recovery for this area, so keep track of it
         if (area_it == goto_recovery_index.end())
         {
             RecoveryState rs;
             rs.level = RETRY;
             rs.num_retries = 0;
-            goto_recovery_index[progress_msg->subarea_name] = rs;
-            area_it = goto_recovery_index.find(progress_msg->subarea_name);
+            goto_recovery_index[progress_msg.subarea_name] = rs;
+            area_it = goto_recovery_index.find(progress_msg.subarea_name);
         }
         area_it->second.num_retries++;
-        auto it = recovery_index.find(progress_msg->action_id);
+        auto it = recovery_index.find(progress_msg.action_id);
         it->second.num_retries = area_it->second.num_retries;
         // TODO: make sure this is not erasing the actual action areas
         recovery_action.areas[failed_area_index].sub_areas.erase(recovery_action.areas[failed_area_index].sub_areas.begin(), recovery_action.areas[failed_area_index].sub_areas.begin() + failed_subarea_index);
@@ -77,7 +77,7 @@ bool GOTORecovery::retry()
     }
     else
     {
-        ROS_WARN_STREAM("Area " << progress_msg->area_name << "or sub_area " << progress_msg->subarea_name << " not found in current action. Cannot retry");
+        ROS_WARN_STREAM("Area " << progress_msg.area_name << "or sub_area " << progress_msg.subarea_name << " not found in current action. Cannot retry");
     }
     return false;
 }
@@ -102,7 +102,7 @@ bool GOTORecovery::reconfigure()
         bool found = false;
         for (int j = 0; j < recovery_action.areas[i].sub_areas.size(); j++)
         {
-            if (recovery_action.areas[i].sub_areas[j].name == progress_msg->subarea_name)
+            if (recovery_action.areas[i].sub_areas[j].name == progress_msg.subarea_name)
             {
                 failed_subarea_index = j;
                 flat_failed_subarea_index = flat_index;
@@ -127,18 +127,18 @@ bool GOTORecovery::reconfigure()
     {
         // check if this is the first time we're trying to recover from reaching this
         // particular area
-        auto area_it = goto_recovery_index.find(progress_msg->subarea_name);
+        auto area_it = goto_recovery_index.find(progress_msg.subarea_name);
         // first time, so keep track of it
         if (area_it == goto_recovery_index.end())
         {
             RecoveryState rs;
             rs.level = RECONFIGURE;
             rs.num_retries = 0;
-            goto_recovery_index[progress_msg->subarea_name] = rs;
-            area_it = goto_recovery_index.find(progress_msg->subarea_name);
+            goto_recovery_index[progress_msg.subarea_name] = rs;
+            area_it = goto_recovery_index.find(progress_msg.subarea_name);
         }
         area_it->second.num_retries++;
-        auto it = recovery_index.find(progress_msg->action_id);
+        auto it = recovery_index.find(progress_msg.action_id);
         it->second.num_retries = area_it->second.num_retries;
 
         // AX = area X
@@ -239,7 +239,7 @@ bool GOTORecovery::reconfigure()
     }
     else
     {
-        ROS_WARN_STREAM("Area " << progress_msg->area_name << " not found in current action. Cannot reconfigure");
+        ROS_WARN_STREAM("Area " << progress_msg.area_name << " not found in current action. Cannot reconfigure");
     }
     return false;
 }
@@ -264,6 +264,6 @@ std::vector<std::tuple<std::string, std::string, std::string>> GOTORecovery::get
 
 std::string GOTORecovery::getFailedActionId()
 {
-    return progress_msg->action_id;
+    return progress_msg.action_id;
 }
 

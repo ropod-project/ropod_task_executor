@@ -6,6 +6,8 @@
 #include <bsoncxx/types.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 
+typedef actionlib::SimpleActionClient<ropod_ros_msgs::GoToAction> Client;
+
 void printTask(ropod_ros_msgs::Task::Ptr &msg);
 
 TaskExecutor::TaskExecutor() :
@@ -21,6 +23,9 @@ TaskExecutor::TaskExecutor() :
     received_task(false),
     action_ongoing(false),
     action_failed(false),
+    goto_client(nh, "goto_action", true),
+    dock_client(nh, "dock_action", true),
+    nav_elevator_client(nh, "nav_elevator_action", true),
     current_action_index(-1)
 {
 }
@@ -36,13 +41,26 @@ std::string TaskExecutor::init()
 
     task_sub = nh.subscribe("task", 1, &TaskExecutor::taskCallback, this);
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
-    action_goto_pub = nh.advertise<ropod_ros_msgs::Action>("GOTO", 1);
-    action_dock_pub = nh.advertise<ropod_ros_msgs::Action>("DOCK", 1);
-    action_undock_pub = nh.advertise<ropod_ros_msgs::Action>("UNDOCK", 1);
-    action_wait_for_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("WAIT_FOR_ELEVATOR", 1);
-    action_enter_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("ENTER_ELEVATOR", 1);
-    action_ride_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("RIDE_ELEVATOR", 1);
-    action_exit_elevator_pub = nh.advertise<ropod_ros_msgs::Action>("EXIT_ELEVATOR", 1);
+
+    ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
+    if (!goto_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to goto action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
+    ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
+    if (!dock_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to dock action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
+    ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
+    if (!nav_elevator_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to elevator nav action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
+    ROS_INFO_STREAM("[task_executor] Connected to all servers successfully.");
 
     elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
     elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
@@ -50,9 +68,9 @@ std::string TaskExecutor::init()
     task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
     task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
     task_progress_elevator_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator_out", 1);
-    task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this);
-    task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this);
-    task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this);
+    /* task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this); */
+    /* task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this); */
+    /* task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this); */
 
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
 
@@ -120,17 +138,35 @@ std::string TaskExecutor::running()
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
         {
-            action_goto_pub.publish(action);
+            ropod_ros_msgs::GoToGoal goto_goal; 
+            goto_goal.action = action;
+            goto_client.sendGoal(
+                    goto_goal,
+                    boost::bind(&TaskExecutor::goToResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::goToFeedbackCb, this, _1));
             current_action_type = GOTO;
         }
         else if (action.type == "DOCK")
         {
-            action_dock_pub.publish(action);
+            ropod_ros_msgs::DockGoal dock_goal; 
+            dock_goal.action = action;
+            dock_client.sendGoal(
+                    dock_goal,
+                    boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
             current_action_type = DOCK;
         }
         else if (action.type == "UNDOCK")
         {
-            action_undock_pub.publish(action);
+            ropod_ros_msgs::DockGoal dock_goal; 
+            dock_goal.action = action;
+            dock_client.sendGoal(
+                    dock_goal,
+                    boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
             current_action_type = UNDOCK;
         }
         else if (action.type == "REQUEST_ELEVATOR")
@@ -143,22 +179,46 @@ std::string TaskExecutor::running()
         {
             action.elevator.elevator_id = elevator_reply->elevator_id;
             action.elevator.door_id = elevator_reply->elevator_door_id;
-            action_wait_for_elevator_pub.publish(action);
+            ropod_ros_msgs::NavElevatorGoal nav_elevator_goal; 
+            nav_elevator_goal.action = action;
+            nav_elevator_client.sendGoal(
+                    nav_elevator_goal,
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = WAIT_FOR_ELEVATOR;
         }
         else if (action.type == "ENTER_ELEVATOR")
         {
-            action_enter_elevator_pub.publish(action);
+            ropod_ros_msgs::NavElevatorGoal nav_elevator_goal; 
+            nav_elevator_goal.action = action;
+            nav_elevator_client.sendGoal(
+                    nav_elevator_goal,
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = ENTER_ELEVATOR;
         }
         else if (action.type == "RIDE_ELEVATOR")
         {
-            action_ride_elevator_pub.publish(action);
+            ropod_ros_msgs::NavElevatorGoal nav_elevator_goal; 
+            nav_elevator_goal.action = action;
+            nav_elevator_client.sendGoal(
+                    nav_elevator_goal,
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = RIDE_ELEVATOR;
         }
         else if (action.type == "EXIT_ELEVATOR")
         {
-            action_exit_elevator_pub.publish(action);
+            ropod_ros_msgs::NavElevatorGoal nav_elevator_goal; 
+            nav_elevator_goal.action = action;
+            nav_elevator_client.sendGoal(
+                    nav_elevator_goal,
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
+                    Client::SimpleActiveCallback(),
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = EXIT_ELEVATOR;
         }
         else
@@ -323,6 +383,11 @@ void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const s
     elevator_request_pub.publish(er);
 }
 
+void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
+{
+    elevator_reply = msg;
+}
+
 void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
 {
     if (state != INIT)
@@ -345,19 +410,28 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     }
 }
 
-void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
+void TaskExecutor::goToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result)
 {
-    elevator_reply = msg;
+    ROS_INFO_STREAM(*result);
+    if (result->success)
+    {
+        action_ongoing = false;
+    }
+    else
+    {
+        action_failed = true;
+    }
 }
 
-void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg)
+void TaskExecutor::goToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback)
 {
-    msg->task_id = current_task->task_id;
-    if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
-    		(msg->status.status_code == ropod_ros_msgs::Status::FAILED ||
-             msg->status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
+    ropod_ros_msgs::TaskProgressGOTO msg = feedback->feedback;
+    msg.task_id = current_task->task_id;
+    if (msg.status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
+    		(msg.status.status_code == ropod_ros_msgs::Status::FAILED ||
+             msg.status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
     {
-        ROS_ERROR_STREAM("GOTO action failed: " << msg->action_id  << " at area: " << msg->area_name);
+        ROS_ERROR_STREAM("GOTO action failed: " << msg.action_id  << " at area: " << msg.area_name);
         goto_progress_msg = msg;
         action_failed = true;
         return;
@@ -367,74 +441,41 @@ void TaskExecutor::taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGO
     goto_recovery.setSubActionSuccessful();
     if (last_action)
     {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-        msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+        msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+        msg.task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
     }
     else
     {
-        msg->task_status.status_code = task_status.status_code;
+        msg.task_status.status_code = task_status.status_code;
     }
 
-    task_progress_goto_pub.publish(*msg);
+    task_progress_goto_pub.publish(msg);
+}
 
-    if (msg->status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::GOAL_REACHED &&
-        msg->sequenceNumber == msg->totalNumber &&
-        msg->action_id == current_action_id)
+void TaskExecutor::dockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result)
+{
+    ROS_INFO_STREAM(*result);
+    if (result->success)
     {
         action_ongoing = false;
     }
-}
-
-void TaskExecutor::taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg)
-{
-    msg->task_id = current_task->task_id;
-
-    if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
-            (msg->status.status_code == ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE ||
-             msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_WAIT_TIMEOUT ||
-             msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED ||
-             msg->status.status_code == ropod_ros_msgs::Status::ELEVATOR_EXITING_FAILED))
+    else
     {
-        ROS_ERROR_STREAM("ENTER_ELEVATOR action failed: " << msg->action_id);
-        elevator_progress_msg = msg;
         action_failed = true;
-        return;
-    }
-
-    if (last_action)
-    {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
-    }
-    else
-    {
-        msg->task_status.status_code = task_status.status_code;
-    }
-
-    task_progress_elevator_pub.publish(*msg);
-
-    if (msg->status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
-        msg->action_id == current_action_id &&
-    	    (msg->status.status_code == ropod_ros_msgs::Status::DOOR_OPENED ||
-             msg->status.status_code == ropod_ros_msgs::Status::ENTERED_ELEVATOR ||
-             msg->status.status_code == ropod_ros_msgs::Status::DESTINATION_FLOOR_REACHED ||
-             msg->status.status_code == ropod_ros_msgs::Status::EXITED_ELEVATOR))
-    {
-        action_ongoing = false;
     }
 }
 
-void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg)
+void TaskExecutor::dockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback)
 {
-    msg->task_id = current_task->task_id;
-    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-        (msg->status.status_code != ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
-         msg->status.status_code != ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
-         msg->status.status_code != ropod_ros_msgs::Status::SUCCEEDED))
+    ropod_ros_msgs::TaskProgressDOCK msg = feedback->feedback;
+    msg.task_id = current_task->task_id;
+    if (msg.status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
+        (msg.status.status_code != ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
+         msg.status.status_code != ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
+         msg.status.status_code != ropod_ros_msgs::Status::SUCCEEDED))
     {
         std::string action_type = (current_action_type == DOCK? "DOCK" : "UNDOCK");
-        ROS_ERROR_STREAM(action_type << " action failed: " << msg->action_id);
+        ROS_ERROR_STREAM(action_type << " action failed: " << msg.action_id);
         dock_progress_msg = msg;
         action_failed = true;
         return;
@@ -442,29 +483,59 @@ void TaskExecutor::taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDO
 
     if (last_action)
     {
-        msg->task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
-    	msg->task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+        msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg.task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
     }
     else
     {
-        msg ->task_status.status_code = task_status.status_code;
+        msg.task_status.status_code = task_status.status_code;
     }
 
-    task_progress_dock_pub.publish(*msg);
-
-    if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    	msg->status.status_code == ropod_ros_msgs::Status::DOCKING_SEQUENCE_SUCCEEDED &&
-        msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
-    else if (msg->status.module_code == ropod_ros_msgs::Status::MOBIDIK_COLLECTION &&
-    		 msg->status.status_code == ropod_ros_msgs::Status::UNDOCKING_SEQUENCE_SUCCEEDED &&
-             msg->action_id == current_action_id)
-    {
-        action_ongoing = false;
-    }
+    task_progress_dock_pub.publish(msg);
     //TODO we have now more cases
+}
+
+void TaskExecutor::navElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result)
+{
+    ROS_INFO_STREAM(*result);
+    if (result->success)
+    {
+        action_ongoing = false;
+    }
+    else
+    {
+        action_failed = true;
+    }
+}
+
+void TaskExecutor::navElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback)
+{
+    ropod_ros_msgs::TaskProgressELEVATOR msg = feedback->feedback;
+    msg.task_id = current_task->task_id;
+
+    if (msg.status.module_code == ropod_ros_msgs::Status::ELEVATOR_ACTION &&
+            (msg.status.status_code == ropod_ros_msgs::Status::WAITING_POINT_UNREACHABLE ||
+             msg.status.status_code == ropod_ros_msgs::Status::ELEVATOR_WAIT_TIMEOUT ||
+             msg.status.status_code == ropod_ros_msgs::Status::ELEVATOR_ENTERING_FAILED ||
+             msg.status.status_code == ropod_ros_msgs::Status::ELEVATOR_EXITING_FAILED))
+    {
+        ROS_ERROR_STREAM("ENTER_ELEVATOR action failed: " << msg.action_id);
+        elevator_progress_msg = msg;
+        action_failed = true;
+        return;
+    }
+
+    if (last_action)
+    {
+        msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    	msg.task_status.status_code = ropod_ros_msgs::Status::SUCCEEDED;
+    }
+    else
+    {
+        msg.task_status.status_code = task_status.status_code;
+    }
+
+    task_progress_elevator_pub.publish(msg);
 }
 
 bool TaskExecutor::recoverFailedAction()
@@ -478,12 +549,18 @@ bool TaskExecutor::recoverFailedAction()
             std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions();
             if (!recovery_actions.empty())
             {
-                action_goto_pub.publish(recovery_actions[0]);
+                ropod_ros_msgs::GoToGoal goto_goal; 
+                goto_goal.action = recovery_actions[0];
+                goto_client.sendGoal(
+                        goto_goal,
+                        boost::bind(&TaskExecutor::goToResultCb, this, _1, _2),
+                        Client::SimpleActiveCallback(),
+                        boost::bind(&TaskExecutor::goToFeedbackCb, this, _1));
             }
         }
         return success;
     }
-    else if (current_action_type == DOCK)
+    else if (current_action_type == DOCK || current_action_type == UNDOCK)
     {
         dock_recovery.setProgressMessage(dock_progress_msg);
         bool success = dock_recovery.recover();
@@ -492,8 +569,14 @@ bool TaskExecutor::recoverFailedAction()
             std::vector<ropod_ros_msgs::Action> recovery_actions = dock_recovery.getRecoveryActions();
             if (!recovery_actions.empty())
             {
-                action_dock_pub.publish(recovery_actions[0]);
-            }
+                ropod_ros_msgs::DockGoal dock_goal; 
+                dock_goal.action = recovery_actions[0];
+                dock_client.sendGoal(
+                        dock_goal,
+                        boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
+                        Client::SimpleActiveCallback(),
+                        boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
+                }
         }
         return success;
     }

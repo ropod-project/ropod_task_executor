@@ -17,6 +17,8 @@ find_package(catkin REQUIRED
     roscpp
     ropod_ros_msgs
     actionlib
+    elevator_navigation
+    route_navigation
 )
 
 include_directories(
@@ -35,6 +37,8 @@ catkin_package(
   CATKIN_DEPENDS
     roscpp
     ropod_ros_msgs
+    elevator_navigation
+    route_navigation
 )
 
 add_executable(ropod_task_executor
