@@ -129,9 +129,9 @@ std::string TaskExecutor::running()
             goto_goal.action = action;
             goto_client.sendGoal(
                     goto_goal,
-                    boost::bind(&TaskExecutor::GoToResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::goToResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::GoToFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::goToFeedbackCb, this, _1));
             current_action_type = GOTO;
         }
         else if (action.type == "DOCK")
@@ -140,9 +140,9 @@ std::string TaskExecutor::running()
             dock_goal.action = action;
             dock_client.sendGoal(
                     dock_goal,
-                    boost::bind(&TaskExecutor::DockResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::DockFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
             current_action_type = DOCK;
         }
         else if (action.type == "UNDOCK")
@@ -151,9 +151,9 @@ std::string TaskExecutor::running()
             dock_goal.action = action;
             dock_client.sendGoal(
                     dock_goal,
-                    boost::bind(&TaskExecutor::DockResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::DockFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
             current_action_type = UNDOCK;
         }
         else if (action.type == "REQUEST_ELEVATOR")
@@ -170,9 +170,9 @@ std::string TaskExecutor::running()
             nav_elevator_goal.action = action;
             nav_elevator_client.sendGoal(
                     nav_elevator_goal,
-                    boost::bind(&TaskExecutor::NavElevatorResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::NavElevatorFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = WAIT_FOR_ELEVATOR;
         }
         else if (action.type == "ENTER_ELEVATOR")
@@ -181,9 +181,9 @@ std::string TaskExecutor::running()
             nav_elevator_goal.action = action;
             nav_elevator_client.sendGoal(
                     nav_elevator_goal,
-                    boost::bind(&TaskExecutor::NavElevatorResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::NavElevatorFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = ENTER_ELEVATOR;
         }
         else if (action.type == "RIDE_ELEVATOR")
@@ -192,9 +192,9 @@ std::string TaskExecutor::running()
             nav_elevator_goal.action = action;
             nav_elevator_client.sendGoal(
                     nav_elevator_goal,
-                    boost::bind(&TaskExecutor::NavElevatorResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::NavElevatorFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = RIDE_ELEVATOR;
         }
         else if (action.type == "EXIT_ELEVATOR")
@@ -203,9 +203,9 @@ std::string TaskExecutor::running()
             nav_elevator_goal.action = action;
             nav_elevator_client.sendGoal(
                     nav_elevator_goal,
-                    boost::bind(&TaskExecutor::NavElevatorResultCb, this, _1, _2),
+                    boost::bind(&TaskExecutor::navElevatorResultCb, this, _1, _2),
                     Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::NavElevatorFeedbackCb, this, _1));
+                    boost::bind(&TaskExecutor::navElevatorFeedbackCb, this, _1));
             current_action_type = EXIT_ELEVATOR;
         }
         else
@@ -397,7 +397,7 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     }
 }
 
-void TaskExecutor::GoToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result)
+void TaskExecutor::goToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result)
 {
     ROS_INFO_STREAM(*result);
     if (result->success)
@@ -410,7 +410,7 @@ void TaskExecutor::GoToResultCb(const actionlib::SimpleClientGoalState& state,co
     }
 }
 
-void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback)
+void TaskExecutor::goToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback)
 {
     ropod_ros_msgs::TaskProgressGOTO msg = feedback->feedback;
     msg.task_id = current_task->task_id;
@@ -439,7 +439,7 @@ void TaskExecutor::GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& fe
     task_progress_goto_pub.publish(msg);
 }
 
-void TaskExecutor::DockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result)
+void TaskExecutor::dockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result)
 {
     ROS_INFO_STREAM(*result);
     if (result->success)
@@ -452,7 +452,7 @@ void TaskExecutor::DockResultCb(const actionlib::SimpleClientGoalState& state,co
     }
 }
 
-void TaskExecutor::DockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback)
+void TaskExecutor::dockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback)
 {
     ropod_ros_msgs::TaskProgressDOCK msg = feedback->feedback;
     msg.task_id = current_task->task_id;
@@ -482,7 +482,7 @@ void TaskExecutor::DockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& fe
     //TODO we have now more cases
 }
 
-void TaskExecutor::NavElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result)
+void TaskExecutor::navElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result)
 {
     ROS_INFO_STREAM(*result);
     if (result->success)
@@ -495,7 +495,7 @@ void TaskExecutor::NavElevatorResultCb(const actionlib::SimpleClientGoalState& s
     }
 }
 
-void TaskExecutor::NavElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback)
+void TaskExecutor::navElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback)
 {
     ropod_ros_msgs::TaskProgressELEVATOR msg = feedback->feedback;
     msg.task_id = current_task->task_id;
@@ -536,14 +536,13 @@ bool TaskExecutor::recoverFailedAction()
             std::vector<ropod_ros_msgs::Action> recovery_actions = goto_recovery.getRecoveryActions();
             if (!recovery_actions.empty())
             {
-                /* action_goto_pub.publish(recovery_actions[0]); */
                 ropod_ros_msgs::GoToGoal goto_goal; 
                 goto_goal.action = recovery_actions[0];
                 goto_client.sendGoal(
                         goto_goal,
-                        boost::bind(&TaskExecutor::GoToResultCb, this, _1, _2),
+                        boost::bind(&TaskExecutor::goToResultCb, this, _1, _2),
                         Client::SimpleActiveCallback(),
-                        boost::bind(&TaskExecutor::GoToFeedbackCb, this, _1));
+                        boost::bind(&TaskExecutor::goToFeedbackCb, this, _1));
             }
         }
         return success;
@@ -561,9 +560,9 @@ bool TaskExecutor::recoverFailedAction()
                 dock_goal.action = recovery_actions[0];
                 dock_client.sendGoal(
                         dock_goal,
-                        boost::bind(&TaskExecutor::DockResultCb, this, _1, _2),
+                        boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
                         Client::SimpleActiveCallback(),
-                        boost::bind(&TaskExecutor::DockFeedbackCb, this, _1));
+                        boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
                 }
         }
         return success;

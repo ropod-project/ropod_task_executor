@@ -236,22 +236,22 @@ private:
     /**
      * callback for result of goto action server request
      */
-    void GoToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result);
+    void goToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result);
 
     /**
      * callback for feedback of goto action server request
      */
-    void GoToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback);
+    void goToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback);
 
     /**
      * callback for result of dock action server request
      */
-    void DockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result);
+    void dockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result);
 
     /**
      * callback for feedback of dock action server request
      */
-    void DockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback);
+    void dockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback);
 
     /**
      * callback for reply to elevator request
@@ -261,12 +261,12 @@ private:
     /**
      * callback for result of elevator related action server request
      */
-    void NavElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result);
+    void navElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result);
 
     /**
      * callback for feedback of elevator related action server request
      */
-    void NavElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback);
+    void navElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback);
     /**
      * Subscriber callback for task messages
      */
