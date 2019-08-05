@@ -17,7 +17,7 @@ std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::GoToAction>> goto_
 std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>> dock_server;
 std::shared_ptr<actionlib::SimpleActionServer<ropod_ros_msgs::NavElevatorAction>> nav_elevator_server;
 
-bool dummyGotoHandler(const ropod_ros_msgs::Action msg)
+bool dummyGotoHandler(const ropod_ros_msgs::Action &msg)
 {
     int num_areas = msg.areas.size();
     ROS_INFO_STREAM("Received action: " << msg.action_id << " with " << num_areas << " areas");
@@ -83,7 +83,7 @@ bool dummyGotoHandler(const ropod_ros_msgs::Action msg)
     return !failed;
 }
 
-bool dummyDockHandler(const ropod_ros_msgs::Action msg)
+bool dummyDockHandler(const ropod_ros_msgs::Action &msg)
 {
     ROS_INFO_STREAM("Received action: " << msg.action_id << " of type " << msg.type);
     bool success = true;
@@ -124,7 +124,7 @@ bool dummyDockHandler(const ropod_ros_msgs::Action msg)
     return success;
 }
 
-bool dummyWaitForElevatorHandler(const ropod_ros_msgs::Action msg)
+bool dummyWaitForElevatorHandler(const ropod_ros_msgs::Action &msg)
 {
     ropod_ros_msgs::TaskProgressELEVATOR out_msg;
     out_msg.action_id = msg.action_id;
@@ -181,7 +181,7 @@ bool dummyWaitForElevatorHandler(const ropod_ros_msgs::Action msg)
     return true;
 }
 
-bool dummyEnterElevatorHandler(const ropod_ros_msgs::Action msg)
+bool dummyEnterElevatorHandler(const ropod_ros_msgs::Action &msg)
 {
     bool success = true;
     ropod_ros_msgs::TaskProgressELEVATOR out_msg;
@@ -217,7 +217,7 @@ bool dummyEnterElevatorHandler(const ropod_ros_msgs::Action msg)
     return success;
 }
 
-bool dummyRideElevatorHandler(const ropod_ros_msgs::Action msg)
+bool dummyRideElevatorHandler(const ropod_ros_msgs::Action &msg)
 {
     ropod_ros_msgs::TaskProgressELEVATOR out_msg;
     out_msg.action_id = msg.action_id;
@@ -233,7 +233,7 @@ bool dummyRideElevatorHandler(const ropod_ros_msgs::Action msg)
     return true;
 }
 
-bool dummyExitElevatorHandler(const ropod_ros_msgs::Action msg)
+bool dummyExitElevatorHandler(const ropod_ros_msgs::Action &msg)
 {
     ropod_ros_msgs::TaskProgressELEVATOR out_msg;
     out_msg.action_id = msg.action_id;
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
 
     dock_server.reset(
             new actionlib::SimpleActionServer<ropod_ros_msgs::DockAction>(
-                nh, "/ropod/dock", boost::bind(dockActionCb, _1),false));
+                nh, "/collect_cart", boost::bind(dockActionCb, _1),false));
     dock_server->start();
 
     nav_elevator_server.reset(
