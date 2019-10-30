@@ -16,6 +16,7 @@
   <build_depend>actionlib</build_depend>
   <build_depend>elevator_navigation</build_depend>
   <build_depend>route_navigation</build_depend>
+  <build_depend>task_planner_ros_wrapper</build_depend>
 
   <run_depend>roscpp</run_depend>
   <run_depend>ropod_ros_msgs</run_depend>

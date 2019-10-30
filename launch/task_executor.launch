@@ -5,6 +5,7 @@
         <remap from="~goto_action" to="/ropod/goto" />
         <remap from="~dock_action" to="/collect_cart" />
         <remap from="~nav_elevator_action" to="/ropod/take_elevator" />
+        <remap from="~task_planner_action" to="/ropod_task_planning/plan" />
         <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
         <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
         <remap from="~progress_goto_in" to="/task_progress/goto" />

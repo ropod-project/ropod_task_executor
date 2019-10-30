@@ -19,6 +19,7 @@ find_package(catkin REQUIRED
     actionlib
     elevator_navigation
     route_navigation
+    task_planner_ros_wrapper
 )
 
 include_directories(

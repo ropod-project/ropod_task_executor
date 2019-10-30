@@ -3,6 +3,8 @@
 #include <boost/uuid/uuid_generators.hpp> // generators
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc
 #include <ros/serialization.h>
+#include <task_planner_ros_wrapper/Predicate.h>
+#include <diagnostic_msgs/KeyValue.h>
 #include <bsoncxx/types.hpp>
 #include <bsoncxx/builder/stream/document.hpp>
 
@@ -26,6 +28,7 @@ TaskExecutor::TaskExecutor() :
     goto_client(nh, "goto_action", true),
     dock_client(nh, "dock_action", true),
     nav_elevator_client(nh, "nav_elevator_action", true),
+    task_planner_client(nh, "task_planner_action", true),
     current_action_index(-1)
 {
 }
@@ -45,19 +48,25 @@ std::string TaskExecutor::init()
     ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
     if (!goto_client.waitForServer(ros::Duration(5)))
     {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to goto action server");
+        ROS_INFO_STREAM("[task_executor] Failed to connect to goto action server");
         return FTSMTransitions::INIT_FAILED;
     }
     ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
     if (!dock_client.waitForServer(ros::Duration(5)))
     {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to dock action server");
+        ROS_INFO_STREAM("[task_executor] Failed to connect to dock action server");
         return FTSMTransitions::INIT_FAILED;
     }
     ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
     if (!nav_elevator_client.waitForServer(ros::Duration(5)))
     {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to elevator nav action server");
+        ROS_INFO_STREAM("[task_executor] Failed to connect to elevator nav action server");
+        return FTSMTransitions::INIT_FAILED;
+    }
+    ROS_INFO_STREAM("[task_executor] waiting for task planner action server...");
+    if (!task_planner_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("[task_executor] Failed to connect to task planner action server");
         return FTSMTransitions::INIT_FAILED;
     }
     ROS_INFO_STREAM("[task_executor] Connected to all servers successfully.");
@@ -383,6 +392,33 @@ void TaskExecutor::requestElevator(const ropod_ros_msgs::Action &action, const s
     elevator_request_pub.publish(er);
 }
 
+void TaskExecutor::getPlanFromCurrentLocation(const ropod_ros_msgs::Action &first_action, std::vector<ropod_ros_msgs::Action> &planned_actions)
+{
+    task_planner_ros_wrapper::PlanGoal goal;
+    goal.robot_name = "frank";
+    goal.task_request.load_type = "mobidik";
+    task_planner_ros_wrapper::Predicate goal_pred;
+    goal_pred.name = "robot_at";
+    diagnostic_msgs::KeyValue p1;
+    diagnostic_msgs::KeyValue p2;
+    p1.key = "bot";
+    p1.value = "frank";
+    p2.key = "loc";
+    p2.value = first_action.areas[0].sub_areas[0].name;
+    goal_pred.params.push_back(p1);
+    goal_pred.params.push_back(p2);
+    goal.task_goals.push_back(goal_pred);
+    task_planner_client.sendGoal(goal);
+    bool finished_before_timeout = task_planner_client.waitForResult(ros::Duration(30.0));
+    ROS_WARN_STREAM("Finished before timeout " << finished_before_timeout);
+    task_planner_ros_wrapper::PlanResult::ConstPtr result = task_planner_client.getResult();
+    ROS_WARN_STREAM("Result " << result->plan_found);
+    for (int i = 0; i < result->actions.size(); i++)
+    {
+        planned_actions.push_back(result->actions[i]);
+    }
+}
+
 void TaskExecutor::elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg)
 {
     elevator_reply = msg;
@@ -404,6 +440,12 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     }
     else
     {
+        std::vector<ropod_ros_msgs::Action> pre_actions;
+        getPlanFromCurrentLocation(msg->robot_actions[0], pre_actions);
+        for (int i = pre_actions.size()-1; i >= 0; i--)
+        {
+            msg->robot_actions.insert(msg->robot_actions.begin(), pre_actions[i]);
+        }
         queueTask(msg, "active");
         setCurrentTask(msg);
         received_task = true;

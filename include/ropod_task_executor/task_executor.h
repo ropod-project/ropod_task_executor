@@ -15,6 +15,8 @@
 #include <ropod_ros_msgs/GoToAction.h>
 #include <ropod_ros_msgs/NavElevatorAction.h>
 #include <ropod_ros_msgs/DockAction.h>
+#include <task_planner_ros_wrapper/PlanAction.h>
+#include <task_planner_ros_wrapper/PlanGoal.h>
 
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
@@ -126,6 +128,12 @@ private:
      * Action client for elevator waiting actions
      */
     actionlib::SimpleActionClient<ropod_ros_msgs::NavElevatorAction> nav_elevator_client;
+
+    /**
+     * Action client for task planning
+     */
+    actionlib::SimpleActionClient<task_planner_ros_wrapper::PlanAction> task_planner_client;
+
 
     /**
      * Publisher for sending elevator requests
@@ -295,6 +303,8 @@ private:
      * @param cart_type Type of load being carried at the moment
      */
     void requestElevator(const ropod_ros_msgs::Action &action, const std::string &task_id, const std::string &cart_type);
+
+    void getPlanFromCurrentLocation(const ropod_ros_msgs::Action &first_action, std::vector<ropod_ros_msgs::Action> &planned_actions);
 
     /**
      * Queue a new task
