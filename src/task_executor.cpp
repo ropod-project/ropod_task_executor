@@ -151,6 +151,8 @@ std::string TaskExecutor::running()
         {
             ropod_ros_msgs::DockGoal dock_goal; 
             dock_goal.action = action;
+            dock_goal.load_type = current_task->load_type;
+            dock_goal.load_id = current_task->load_id;
             dock_client.sendGoal(
                     dock_goal,
                     boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
@@ -162,6 +164,8 @@ std::string TaskExecutor::running()
         {
             ropod_ros_msgs::DockGoal dock_goal; 
             dock_goal.action = action;
+            dock_goal.load_type = current_task->load_type;
+            dock_goal.load_id = current_task->load_id;
             dock_client.sendGoal(
                     dock_goal,
                     boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
@@ -571,6 +575,8 @@ bool TaskExecutor::recoverFailedAction()
             {
                 ropod_ros_msgs::DockGoal dock_goal; 
                 dock_goal.action = recovery_actions[0];
+                dock_goal.load_type = current_task->load_type;
+                dock_goal.load_id = current_task->load_id;
                 dock_client.sendGoal(
                         dock_goal,
                         boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
