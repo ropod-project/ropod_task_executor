@@ -15,13 +15,12 @@
 #include <ropod_ros_msgs/GoToAction.h>
 #include <ropod_ros_msgs/NavElevatorAction.h>
 #include <ropod_ros_msgs/DockAction.h>
-#include <task_planner_ros_wrapper/PlanAction.h>
-#include <task_planner_ros_wrapper/PlanGoal.h>
 
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
 
 #include <ftsm_base.h>
+#include <ropod_task_executor/task_planning_helper.h>
 #include <ropod_task_executor/goto_recovery.h>
 #include <ropod_task_executor/dock_recovery.h>
 #include <ropod_task_executor/elevator_recovery.h>
@@ -128,11 +127,6 @@ private:
      * Action client for elevator waiting actions
      */
     actionlib::SimpleActionClient<ropod_ros_msgs::NavElevatorAction> nav_elevator_client;
-
-    /**
-     * Action client for task planning
-     */
-    actionlib::SimpleActionClient<task_planner_ros_wrapper::PlanAction> task_planner_client;
 
 
     /**
@@ -242,6 +236,11 @@ private:
     ropod_ros_msgs::TaskProgressELEVATOR elevator_progress_msg;
 
     /**
+     * Object for task planning related functions
+     */
+    TaskPlanningHelper task_planning_helper;
+
+    /**
      * callback for result of goto action server request
      */
     void goToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result);
@@ -303,8 +302,6 @@ private:
      * @param cart_type Type of load being carried at the moment
      */
     void requestElevator(const ropod_ros_msgs::Action &action, const std::string &task_id, const std::string &cart_type);
-
-    void getPlanFromCurrentLocation(const ropod_ros_msgs::Action &first_action, std::vector<ropod_ros_msgs::Action> &planned_actions);
 
     /**
      * Queue a new task

@@ -1026,8 +1026,8 @@ robot_actions:
     goal_floor: 0
     execution_status: ''
     estimated_duration: -1.0
-load_type: ''
-load_id: ''
+load_type: 'mobidik'
+load_id: 'load_001'
 team_robot_ids: [ropod_001]
 start_time: 1554215333.42
 finish_time: 1554215337.42
