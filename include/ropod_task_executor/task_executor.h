@@ -318,6 +318,10 @@ private:
 
     std::string checkDependsStatuses();
 
+    virtual bool initGotoServer();
+    virtual bool initDockServer();
+    virtual bool initElevatorServer();
+
 public:
     TaskExecutor();
     TaskExecutor(bool debugModeActive);

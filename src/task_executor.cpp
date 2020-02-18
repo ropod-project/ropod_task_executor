@@ -64,40 +64,63 @@ std::string TaskExecutor::init()
     task_sub = nh.subscribe("task", 1, &TaskExecutor::taskCallback, this);
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
 
-    ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
-    if (!goto_client.waitForServer(ros::Duration(5)))
-    {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to goto action server");
+    if (!initGotoServer() || !initDockServer() || !initElevatorServer())
         return FTSMTransitions::INIT_FAILED;
-    }
-    ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
-    if (!dock_client.waitForServer(ros::Duration(5)))
-    {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to dock action server");
-        return FTSMTransitions::INIT_FAILED;
-    }
-    ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
-    if (!nav_elevator_client.waitForServer(ros::Duration(5)))
-    {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to elevator nav action server");
-        return FTSMTransitions::INIT_FAILED;
-    }
+
     ROS_INFO_STREAM("[task_executor] Connected to all servers successfully.");
-
-    elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
-    elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
-
-    task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
-    task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
-    task_progress_elevator_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator_out", 1);
-    /* task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this); */
-    /* task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this); */
-    /* task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this); */
 
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
 
     std::string transition = checkDependsStatuses();
     return FTSMTransitions::INITIALISED;
+}
+
+bool TaskExecutor::initGotoServer()
+{
+    ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
+    if (!goto_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("[task_executor] Failed to connect to goto action server");
+        return false;
+    }
+
+    task_progress_goto_pub = nh.advertise<ropod_ros_msgs::TaskProgressGOTO>("progress_goto_out", 1);
+
+    /* task_progress_goto_sub = nh.subscribe("progress_goto_in", 1, &TaskExecutor::taskProgressGOTOCallback, this); */
+    return true;
+}
+
+bool TaskExecutor::initDockServer()
+{
+    ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
+    if (!dock_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to dock action server");
+        return false;
+    }
+
+    task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
+
+    /* task_progress_dock_sub = nh.subscribe("progress_dock_in", 1, &TaskExecutor::taskProgressDOCKCallback, this); */
+    return true;
+}
+
+bool TaskExecutor::initElevatorServer()
+{
+    ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
+    if (!nav_elevator_client.waitForServer(ros::Duration(5)))
+    {
+        ROS_INFO_STREAM("]task_executor] Failed to connect to elevator nav action server");
+        return false;
+    }
+
+    elevator_reply_sub = nh.subscribe("elevator_reply", 1, &TaskExecutor::elevatorReplyCallback, this);
+    elevator_request_pub = nh.advertise<ropod_ros_msgs::ElevatorRequest>("elevator_request", 1);
+
+    task_progress_elevator_pub = nh.advertise<ropod_ros_msgs::TaskProgressELEVATOR>("progress_elevator_out", 1);
+
+    /* task_progress_elevator_sub = nh.subscribe("progress_elevator_in", 1, &TaskExecutor::taskProgressElevatorCallback, this); */
+    return true;
 }
 
 std::string TaskExecutor::configuring()
@@ -708,21 +731,4 @@ void printTask(ropod_ros_msgs::Task::Ptr &msg)
     {
         std::cout << msg->robot_actions[i].type << std::endl;
     }
-}
-
-int main(int argc, char **argv)
-{
-    ros::init(argc, argv, "task_executor");
-    TaskExecutor te;
-    ROS_INFO("Ready.");
-
-    ros::Rate loop_rate(10);
-    te.run();
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
-
-    return 0;
 }
