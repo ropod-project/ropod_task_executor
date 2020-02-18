@@ -30,6 +30,28 @@ TaskExecutor::TaskExecutor() :
 {
 }
 
+TaskExecutor::TaskExecutor(bool debugMode) :
+    FTSMBase("task_executor",
+             {"roscore", "route_navigation", "com_mediator", "task_planner", "cart_collector"},
+             {{"functional", {{"roscore", "ros/ros_master_monitor"},
+                              {"com_mediator", "ros/ros_node_monitor"},
+                              {"route_navigation", "ros/ros_node_monitor"},
+                              {"task_planner", "none"},
+                              {"cart_collector", "none"}}}},
+             1, "robot_store", 27017, "components", "status",
+             "component_sm_states", debugMode),
+    state(INIT),
+    nh("~"),
+    received_task(false),
+    action_ongoing(false),
+    action_failed(false),
+    goto_client(nh, "goto_action", true),
+    dock_client(nh, "dock_action", true),
+    nav_elevator_client(nh, "nav_elevator_action", true),
+    current_action_index(-1)
+{
+}
+
 TaskExecutor::~TaskExecutor()
 {
 }

@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-    <node pkg="ropod_task_executor" type="ropod_task_executor" name="ropod_task_executor" output="screen">
+    <arg name="debug_mode" default="false"/>
+    <node pkg="ropod_task_executor" type="ropod_task_executor" name="ropod_task_executor" output="screen" args="debug_mode=$(arg debug_mode)">
         <remap from="~task" to="/ropod_com_mediator/task" />
         <remap from="~goto_action" to="/ropod/goto" />
         <remap from="~dock_action" to="/collect_cart" />
