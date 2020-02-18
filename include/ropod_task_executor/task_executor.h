@@ -35,7 +35,7 @@ using namespace ftsm;
  */
 class TaskExecutor : public FTSMBase
 {
-private:
+protected:
     /**
      * types of Actions
      */
