@@ -64,7 +64,7 @@ std::string TaskExecutor::init()
     task_sub = nh.subscribe("task", 1, &TaskExecutor::taskCallback, this);
     task_feedback_pub = nh.advertise<ropod_ros_msgs::Task>("feedback", 1);
 
-    if (!initGotoServer() || !initDockServer() || !initElevatorServer())
+    if (!initGotoClient() || !initDockClient() || !initElevatorClient())
         return FTSMTransitions::INIT_FAILED;
 
     ROS_INFO_STREAM("[task_executor] Connected to all servers successfully.");
@@ -75,7 +75,7 @@ std::string TaskExecutor::init()
     return FTSMTransitions::INITIALISED;
 }
 
-bool TaskExecutor::initGotoServer()
+bool TaskExecutor::initGotoClient()
 {
     ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
     if (!goto_client.waitForServer(ros::Duration(5)))
@@ -90,7 +90,7 @@ bool TaskExecutor::initGotoServer()
     return true;
 }
 
-bool TaskExecutor::initDockServer()
+bool TaskExecutor::initDockClient()
 {
     ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
     if (!dock_client.waitForServer(ros::Duration(5)))
@@ -105,7 +105,7 @@ bool TaskExecutor::initDockServer()
     return true;
 }
 
-bool TaskExecutor::initElevatorServer()
+bool TaskExecutor::initElevatorClient()
 {
     ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
     if (!nav_elevator_client.waitForServer(ros::Duration(5)))

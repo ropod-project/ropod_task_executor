@@ -318,9 +318,9 @@ protected:
 
     std::string checkDependsStatuses();
 
-    virtual bool initGotoServer();
-    virtual bool initDockServer();
-    virtual bool initElevatorServer();
+    virtual bool initGotoClient();
+    virtual bool initDockClient();
+    virtual bool initElevatorClient();
 
 public:
     TaskExecutor();

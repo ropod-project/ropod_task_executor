@@ -11,8 +11,8 @@
 class TaskExecutorSim : public TaskExecutor
 {
 protected:
-    virtual bool initDockServer();
-    virtual bool initElevatorServer();
+    virtual bool initDockClient();
+    virtual bool initElevatorClient();
 
 public:
     TaskExecutorSim();

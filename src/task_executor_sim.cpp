@@ -22,13 +22,13 @@ TaskExecutorSim::TaskExecutorSim() :
 {
 }
 
-bool TaskExecutorSim::initDockServer()
+bool TaskExecutorSim::initDockClient()
 {
     // Skip initialization of the Docking actions
     return true;
 }
 
-bool TaskExecutorSim::initElevatorServer()
+bool TaskExecutorSim::initElevatorClient()
 {
     // Skip initialization of the Elevator behaviors
     return true;
