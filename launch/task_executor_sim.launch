@@ -31,6 +31,8 @@
     </group>
 
     <node pkg="ropod_task_executor" type="ropod_task_executor" name="ropod_task_executor" output="screen" args="debug_mode=$(arg debug_mode) sim_mode=$(arg sim_mode)">
+        <param name="db_name" value="task_execution_$(arg robot_name)"/>
+
         <remap from="~task" to="ropod_com_mediator/task" />
         <remap from="~goto_action" to="goto" />
         <remap from="~dock_action" to="collect_cart" />
