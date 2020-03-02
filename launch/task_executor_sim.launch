@@ -2,19 +2,46 @@
 <launch>
     <arg name="debug_mode" default="false"/>
     <arg name="sim_mode" default="true"/>
+    <arg name="robot_name" default="ropod"/>
+    <arg name="launch_dependencies" default="false"/>
+
+    <group if="$(arg launch_dependencies)">
+        <include file="$(find osm_bridge_ros_wrapper)/ros/launch/osm_bridge.launch" >
+            <arg name="building" value="BRSU" />
+            <arg name="robot_name" value="$(arg robot_name)" />
+        </include>
+
+        <include file="$(find ropod_wm_mediator)/launch/wm_mediator_sim.launch" >
+            <arg name="robot_name" value="$(arg robot_name)" />
+        </include>
+
+        <include file="$(find route_planner)/launch/route_planner.launch" >
+            <arg name="robot_name" value="$(arg robot_name)" />
+        </include>
+
+        <include file="$(find ropod_navigation_mediator)/launch/ropod_navigation_mediator.launch" >
+            <arg name="robot_name" value="$(arg robot_name)" />
+        </include>
+
+        <include file="$(find napoleon_navigation)/launch/napoleon_navigation_brsu.launch" >
+            <arg name="amcl_topic" value="/$(arg robot_name)_amcl/pose" />
+            <arg name="robot_name" value="$(arg robot_name)" />
+            <arg name="load_name" value="$(arg robot_name)" />
+        </include>
+    </group>
 
     <node pkg="ropod_task_executor" type="ropod_task_executor" name="ropod_task_executor" output="screen" args="debug_mode=$(arg debug_mode) sim_mode=$(arg sim_mode)">
-        <remap from="~task" to="/ropod_com_mediator/task" />
-        <remap from="~goto_action" to="/ropod/goto" />
-        <remap from="~dock_action" to="/collect_cart" />
-        <remap from="~nav_elevator_action" to="/ropod/take_elevator" />
-        <remap from="~elevator_request" to="/ropod_com_mediator/elevator_request" />
-        <remap from="~elevator_reply" to="/ropod_com_mediator/elevator_request_reply" />
-        <remap from="~progress_goto_in" to="/task_progress/goto" />
-        <remap from="~progress_dock_in" to="/task_progress/dock" />
-        <remap from="~progress_elevator_in" to="/task_progress/elevator" />
-        <remap from="~progress_goto_out" to="/ropod_com_mediator/ropod_task_feedback/goto" />
-        <remap from="~progress_dock_out" to="/ropod_com_mediator/ropod_task_feedback/dock" />
-        <remap from="~progress_elevator_out" to="/ropod_com_mediator/ropod_task_feedback/elevator" />
+        <remap from="~task" to="ropod_com_mediator/task" />
+        <remap from="~goto_action" to="goto" />
+        <remap from="~dock_action" to="collect_cart" />
+        <remap from="~nav_elevator_action" to="take_elevator" />
+        <remap from="~elevator_request" to="ropod_com_mediator/elevator_request" />
+        <remap from="~elevator_reply" to="ropod_com_mediator/elevator_request_reply" />
+        <remap from="~progress_goto_in" to="task_progress/goto" />
+        <remap from="~progress_dock_in" to="task_progress/dock" />
+        <remap from="~progress_elevator_in" to="task_progress/elevator" />
+        <remap from="~progress_goto_out" to="ropod_com_mediator/ropod_task_feedback/goto" />
+        <remap from="~progress_dock_out" to="ropod_com_mediator/ropod_task_feedback/dock" />
+        <remap from="~progress_elevator_out" to="ropod_com_mediator/ropod_task_feedback/elevator" />
     </node>
 </launch>

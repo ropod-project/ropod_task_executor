@@ -1,6 +1,6 @@
 #include <ropod_task_executor/goto_recovery.h>
 
-GOTORecovery::GOTORecovery() : path_planner_client("/get_path_plan")
+GOTORecovery::GOTORecovery() : path_planner_client("get_path_plan")
 {
 }
 
