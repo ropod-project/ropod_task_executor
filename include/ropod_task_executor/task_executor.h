@@ -2,14 +2,31 @@
 #define TASK_EXECUTOR_H
 
 #include <ros/ros.h>
+#include <actionlib/client/simple_action_client.h>
 #include <ropod_ros_msgs/Task.h>
 #include <ropod_ros_msgs/TaskProgressGOTO.h>
+#include <ropod_ros_msgs/TaskProgressDOCK.h>
+#include <ropod_ros_msgs/TaskProgressELEVATOR.h>
+#include <ropod_ros_msgs/Status.h>
 #include <ropod_ros_msgs/Action.h>
 #include <ropod_ros_msgs/Waypoint.h>
 #include <ropod_ros_msgs/ElevatorRequest.h>
 #include <ropod_ros_msgs/ElevatorRequestReply.h>
-#include <ropod_ros_msgs/ropod_demo_plan.h>
+#include <ropod_ros_msgs/GoToAction.h>
+#include <ropod_ros_msgs/NavElevatorAction.h>
+#include <ropod_ros_msgs/DockAction.h>
 
+#include <mongocxx/client.hpp>
+#include <mongocxx/instance.hpp>
+
+#include <ftsm_base.h>
+#include <ropod_task_executor/task_planning_helper.h>
+#include <ropod_task_executor/goto_recovery.h>
+#include <ropod_task_executor/dock_recovery.h>
+#include <ropod_task_executor/elevator_recovery.h>
+
+
+using namespace ftsm;
 /**
  * Executor of tasks sent by fleet management.
  * Also publishes feedback when intermediate actions are complete,
@@ -17,7 +34,7 @@
  *
  * @author Santosh Thoduka
  */
-class TaskExecutor
+class TaskExecutor : public FTSMBase
 {
 private:
     /**
@@ -29,7 +46,8 @@ private:
         DOCK,
         UNDOCK,
         REQUEST_ELEVATOR,
-        GOTO_ELEVATOR,
+        WAIT_FOR_ELEVATOR,
+        RIDE_ELEVATOR,
         ENTER_ELEVATOR,
         EXIT_ELEVATOR
     };
@@ -49,6 +67,16 @@ private:
      * Current state in internal state machine
      */
     State state;
+
+    /**
+     * Current task status
+     */
+    ropod_ros_msgs::Status task_status;
+
+    /**
+     * Flag indicating whether the current action is the last action in the task
+     */
+    bool last_action;
 
     /**
      * ros private node handle
@@ -71,24 +99,35 @@ private:
     ros::Subscriber task_progress_goto_sub;
 
     /**
+     * Subscriber for TaskProgressDOCK messages (from navigation)
+     */
+    ros::Subscriber task_progress_dock_sub;
+
+    /**
+     * Subscriber for TaskProgressELEVATOR messages (from navigation)
+     */
+    ros::Subscriber task_progress_elevator_sub;
+
+    /**
      * Publisher for task and action feedback
      */
     ros::Publisher task_feedback_pub;
 
     /**
-     * Publisher for sending go_to actions to navigation
+     * Action client for sending go_to actions to navigation
      */
-    ros::Publisher action_goto_pub;
+    actionlib::SimpleActionClient<ropod_ros_msgs::GoToAction> goto_client;
 
     /**
-     * Publisher for sending dock actions
+     * Action client for sending dock actions
      */
-    ros::Publisher action_dock_pub;
+    actionlib::SimpleActionClient<ropod_ros_msgs::DockAction> dock_client;
 
     /**
-     * Publisher for sending undock actions
+     * Action client for elevator waiting actions
      */
-    ros::Publisher action_undock_pub;
+    actionlib::SimpleActionClient<ropod_ros_msgs::NavElevatorAction> nav_elevator_client;
+
 
     /**
      * Publisher for sending elevator requests
@@ -99,6 +138,16 @@ private:
      * Publisher for sending TaskProgressGOTO messages (to com mediator)
      */
     ros::Publisher task_progress_goto_pub;
+
+    /**
+     * Publisher for sending TaskProgressDOCK messages (to com mediator)
+     */
+    ros::Publisher task_progress_dock_pub;
+
+    /**
+     * Publisher for sending TaskProgressELEVATOR messages (to com mediator)
+     */
+    ros::Publisher task_progress_elevator_pub;
 
     /**
      * Reply to elevator request
@@ -127,6 +176,11 @@ private:
     bool action_ongoing;
 
     /**
+     * Flag indicating whether an action within the task failed
+     */
+    bool action_failed;
+
+    /**
      * Index of current action being executed
      */
     int current_action_index;
@@ -142,10 +196,84 @@ private:
     std::string current_elevator_query_id;
 
     /**
+     * Name of database used to save task state
+     */
+    std::string db_name;
+
+    /**
+     * Name of collection for saving task queue
+     */
+    std::string collection_name;
+
+    /**
+     * GOTO recovery object
+     */
+    GOTORecovery goto_recovery;
+
+    /**
+     * DOCK recovery object
+     */
+    DOCKRecovery dock_recovery;
+
+    /**
+     * Elevator recovery object
+     */
+    ElevatorRecovery elevator_recovery;
+
+    /**
+     * Last GOTO progress message
+     */
+    ropod_ros_msgs::TaskProgressGOTO goto_progress_msg;
+
+    /**
+     * Last DOCK progress message
+     */
+    ropod_ros_msgs::TaskProgressDOCK dock_progress_msg;
+
+    /**
+     * Last ELEVATOR progress message
+     */
+    ropod_ros_msgs::TaskProgressELEVATOR elevator_progress_msg;
+
+    /**
+     * Object for task planning related functions
+     */
+    TaskPlanningHelper task_planning_helper;
+
+    /**
+     * callback for result of goto action server request
+     */
+    void goToResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::GoToResultConstPtr& result);
+
+    /**
+     * callback for feedback of goto action server request
+     */
+    void goToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& feedback);
+
+    /**
+     * callback for result of dock action server request
+     */
+    void dockResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::DockResultConstPtr& result);
+
+    /**
+     * callback for feedback of dock action server request
+     */
+    void dockFeedbackCb(const ropod_ros_msgs::DockFeedbackConstPtr& feedback);
+
+    /**
      * callback for reply to elevator request
      */
     void elevatorReplyCallback(const ropod_ros_msgs::ElevatorRequestReply::Ptr &msg);
 
+    /**
+     * callback for result of elevator related action server request
+     */
+    void navElevatorResultCb(const actionlib::SimpleClientGoalState& state,const ropod_ros_msgs::NavElevatorResultConstPtr& result);
+
+    /**
+     * callback for feedback of elevator related action server request
+     */
+    void navElevatorFeedbackCb(const ropod_ros_msgs::NavElevatorFeedbackConstPtr& feedback);
     /**
      * Subscriber callback for task messages
      */
@@ -154,8 +282,17 @@ private:
     /**
      * Subscriber callback for task progress messages for GOTO actions
      */
-    void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg);
+    /* void taskProgressGOTOCallback(const ropod_ros_msgs::TaskProgressGOTO::Ptr &msg); */
 
+    /**
+     * Subscriber callback for task progress messages for DOCK actions
+     */
+    /*void taskProgressDOCKCallback(const ropod_ros_msgs::TaskProgressDOCK::Ptr &msg);*/
+
+    /**
+     * Subscriber callback for task progress messages for ENTER_ELEVATOR and EXIT_ELEVATOR actions
+     */
+    void taskProgressElevatorCallback(const ropod_ros_msgs::TaskProgressELEVATOR::Ptr &msg);
 
     /**
      * Publish a message to request an elevator
@@ -166,14 +303,39 @@ private:
      */
     void requestElevator(const ropod_ros_msgs::Action &action, const std::string &task_id, const std::string &cart_type);
 
+    /**
+     * Queue a new task
+     */
+    void queueTask(const ropod_ros_msgs::Task::Ptr &task, const std::string &status);
+
+    /**
+     * Check and get next task from queue
+     */
+    bool getNextTask(ropod_ros_msgs::Task::Ptr &task);
+
+    /**
+     * Remove a task from the queue
+     */
+    void removeTask(const std::string &task_id);
+
+    void setCurrentTask(const ropod_ros_msgs::Task::Ptr &msg);
+    void setCurrentActionIndex(int index);
+
+    bool recoverFailedAction();
+
+    std::string checkDependsStatuses();
+
 public:
     TaskExecutor();
     virtual ~TaskExecutor();
 
-    /**
-     * Main loop; dispatches actions one by one
-     */
-    void run();
+
+    std::string init();
+    std::string configuring();
+    std::string ready();
+    std::string running();
+    std::string recovering();
+
 };
 
 #endif /* TASK_EXECUTOR_H */
