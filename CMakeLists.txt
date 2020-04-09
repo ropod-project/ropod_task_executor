@@ -19,6 +19,7 @@ find_package(catkin REQUIRED
     actionlib
     elevator_navigation
     route_navigation
+    task_planner_ros_wrapper
 )
 
 include_directories(
@@ -43,6 +44,7 @@ catkin_package(
 
 add_executable(ropod_task_executor
     src/task_executor.cpp
+    src/task_planning_helper.cpp
     src/goto_recovery.cpp
     src/dock_recovery.cpp
     src/elevator_recovery.cpp

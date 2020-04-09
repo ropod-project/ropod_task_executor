@@ -20,6 +20,7 @@
 #include <mongocxx/instance.hpp>
 
 #include <ftsm_base.h>
+#include <ropod_task_executor/task_planning_helper.h>
 #include <ropod_task_executor/goto_recovery.h>
 #include <ropod_task_executor/dock_recovery.h>
 #include <ropod_task_executor/elevator_recovery.h>
@@ -127,6 +128,7 @@ private:
      */
     actionlib::SimpleActionClient<ropod_ros_msgs::NavElevatorAction> nav_elevator_client;
 
+
     /**
      * Publisher for sending elevator requests
      */
@@ -232,6 +234,11 @@ private:
      * Last ELEVATOR progress message
      */
     ropod_ros_msgs::TaskProgressELEVATOR elevator_progress_msg;
+
+    /**
+     * Object for task planning related functions
+     */
+    TaskPlanningHelper task_planning_helper;
 
     /**
      * callback for result of goto action server request

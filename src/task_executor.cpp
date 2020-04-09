@@ -45,19 +45,19 @@ std::string TaskExecutor::init()
     ROS_INFO_STREAM("[task_executor] waiting for goto action server...");
     if (!goto_client.waitForServer(ros::Duration(5)))
     {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to goto action server");
+        ROS_WARN_STREAM("[task_executor] Failed to connect to goto action server");
         return FTSMTransitions::INIT_FAILED;
     }
     ROS_INFO_STREAM("[task_executor] waiting for dock action server...");
     if (!dock_client.waitForServer(ros::Duration(5)))
     {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to dock action server");
+        ROS_WARN_STREAM("[task_executor] Failed to connect to dock action server");
         return FTSMTransitions::INIT_FAILED;
     }
     ROS_INFO_STREAM("[task_executor] waiting for elevator navigation action server...");
     if (!nav_elevator_client.waitForServer(ros::Duration(5)))
     {
-        ROS_INFO_STREAM("]task_executor] Failed to connect to elevator nav action server");
+        ROS_WARN_STREAM("[task_executor] Failed to connect to elevator nav action server");
         return FTSMTransitions::INIT_FAILED;
     }
     ROS_INFO_STREAM("[task_executor] Connected to all servers successfully.");
@@ -75,6 +75,7 @@ std::string TaskExecutor::init()
     task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
 
     std::string transition = checkDependsStatuses();
+    task_planning_helper.init();
     return FTSMTransitions::INITIALISED;
 }
 
@@ -408,6 +409,14 @@ void TaskExecutor::taskCallback(const ropod_ros_msgs::Task::Ptr &msg)
     }
     else
     {
+        std::vector<ropod_ros_msgs::Action> pre_actions;
+        task_planning_helper.getPlanFromCurrentLocation(msg->robot_actions[0], pre_actions);
+        int insert_index = 0;
+        for (int i = 0; i < pre_actions.size(); i++)
+        {
+            msg->robot_actions.insert(msg->robot_actions.begin()+insert_index, pre_actions[i]);
+            insert_index++;
+        }
         queueTask(msg, "active");
         setCurrentTask(msg);
         received_task = true;
