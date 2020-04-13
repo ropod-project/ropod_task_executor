@@ -183,40 +183,15 @@ std::string TaskExecutor::running()
         ROS_INFO_STREAM("Dispatching action: " << action.type << " ID: " << action.action_id);
         if (action.type == "GOTO")
         {
-            ropod_ros_msgs::GoToGoal goto_goal; 
-            goto_goal.action = action;
-            goto_client.sendGoal(
-                    goto_goal,
-                    boost::bind(&TaskExecutor::goToResultCb, this, _1, _2),
-                    Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::goToFeedbackCb, this, _1));
-            current_action_type = GOTO;
+            startGotoAction(action);
         }
         else if (action.type == "DOCK")
         {
-            ropod_ros_msgs::DockGoal dock_goal; 
-            dock_goal.action = action;
-            dock_goal.load_type = current_task->load_type;
-            dock_goal.load_id = current_task->load_id;
-            dock_client.sendGoal(
-                    dock_goal,
-                    boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
-                    Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
-            current_action_type = DOCK;
+            startDockAction(action);
         }
         else if (action.type == "UNDOCK")
         {
-            ropod_ros_msgs::DockGoal dock_goal; 
-            dock_goal.action = action;
-            dock_goal.load_type = current_task->load_type;
-            dock_goal.load_id = current_task->load_id;
-            dock_client.sendGoal(
-                    dock_goal,
-                    boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
-                    Client::SimpleActiveCallback(),
-                    boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
-            current_action_type = UNDOCK;
+            startUndockAction(action);
         }
         else if (action.type == "REQUEST_ELEVATOR")
         {
@@ -324,6 +299,46 @@ std::string TaskExecutor::running()
         removeTask(current_task->task_id);
         return FTSMTransitions::DONE;
     }
+}
+
+void TaskExecutor::startGotoAction(const ropod_ros_msgs::Action& action)
+{
+    ropod_ros_msgs::GoToGoal goto_goal; 
+    goto_goal.action = action;
+    goto_client.sendGoal(
+            goto_goal,
+            boost::bind(&TaskExecutor::goToResultCb, this, _1, _2),
+            Client::SimpleActiveCallback(),
+            boost::bind(&TaskExecutor::goToFeedbackCb, this, _1));
+    current_action_type = GOTO;
+}
+
+void TaskExecutor::startDockAction(const ropod_ros_msgs::Action& action)
+{
+    ropod_ros_msgs::DockGoal dock_goal; 
+    dock_goal.action = action;
+    dock_goal.load_type = current_task->load_type;
+    dock_goal.load_id = current_task->load_id;
+    dock_client.sendGoal(
+            dock_goal,
+            boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
+            Client::SimpleActiveCallback(),
+            boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
+    current_action_type = DOCK;
+}
+
+void TaskExecutor::startUndockAction(const ropod_ros_msgs::Action& action)
+{
+    ropod_ros_msgs::DockGoal dock_goal; 
+    dock_goal.action = action;
+    dock_goal.load_type = current_task->load_type;
+    dock_goal.load_id = current_task->load_id;
+    dock_client.sendGoal(
+            dock_goal,
+            boost::bind(&TaskExecutor::dockResultCb, this, _1, _2),
+            Client::SimpleActiveCallback(),
+            boost::bind(&TaskExecutor::dockFeedbackCb, this, _1));
+    current_action_type = UNDOCK;
 }
 
 std::string TaskExecutor::recovering()
