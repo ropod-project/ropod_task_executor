@@ -14,6 +14,10 @@ protected:
     virtual bool initDockClient();
     virtual bool initElevatorClient();
 
+    virtual void startGotoAction(const ropod_ros_msgs::Action& action);
+    virtual void startDockAction(const ropod_ros_msgs::Action& action);
+    virtual void startUndockAction(const ropod_ros_msgs::Action& action);
+
 public:
     TaskExecutorSim();
 

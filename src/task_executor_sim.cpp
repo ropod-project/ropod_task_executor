@@ -1,5 +1,9 @@
 #include <ropod_task_executor/task_executor_sim.h>
 
+#define SEND_DUMMY_GOTO_FEEDBACK_AND_RESULT 1
+#define SEND_DUMMY_DOCK_FEEDBACK_AND_RESULT 1
+#define SEND_DUMMY_UNDOCK_FEEDBACK_AND_RESULT 1
+
 bool getModeStatus(int argc, char **argv, const std::string modeName="debug_mode")
 {
     bool mode = false;
@@ -24,7 +28,8 @@ TaskExecutorSim::TaskExecutorSim() :
 
 bool TaskExecutorSim::initDockClient()
 {
-    // Skip initialization of the Docking actions
+    // Skip initialization of the Dock action server
+    task_progress_dock_pub = nh.advertise<ropod_ros_msgs::TaskProgressDOCK>("progress_dock_out", 1);
     return true;
 }
 
@@ -32,6 +37,78 @@ bool TaskExecutorSim::initElevatorClient()
 {
     // Skip initialization of the Elevator behaviors
     return true;
+}
+
+void TaskExecutorSim::startGotoAction(const ropod_ros_msgs::Action& action)
+{
+    ROS_ERROR("[TaskExecutorSim] startGotoAction() called...");
+
+#ifdef SEND_DUMMY_GOTO_FEEDBACK_AND_RESULT
+    ropod_ros_msgs::GoToFeedbackPtr feedback(new ropod_ros_msgs::GoToFeedback());
+    ropod_ros_msgs::TaskProgressGOTO msg = ropod_ros_msgs::TaskProgressGOTO();
+    msg.task_id = current_task->task_id;
+    msg.action_id = current_action_id;
+    msg.action_type = "GOTO";
+    msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    msg.task_status.status_code = ropod_ros_msgs::Status::RUNNING;
+    msg.status.status_code  = ropod_ros_msgs::Status::SUCCEEDED;
+    feedback->feedback = msg;
+    goToFeedbackCb(feedback);
+
+    ropod_ros_msgs::GoToResultPtr result(new ropod_ros_msgs::GoToResult());
+    result->success = true;
+    goToResultCb(actionlib::SimpleClientGoalState::SUCCEEDED, result);
+#else
+    TaskExecutor::startGotoAction(action);
+#endif
+}
+
+void TaskExecutorSim::startDockAction(const ropod_ros_msgs::Action& action)
+{
+    ROS_ERROR("[TaskExecutorSim] startDockAction() called...");
+
+#ifdef SEND_DUMMY_DOCK_FEEDBACK_AND_RESULT
+    ropod_ros_msgs::DockFeedbackPtr feedback(new ropod_ros_msgs::DockFeedback());
+    ropod_ros_msgs::TaskProgressDOCK msg = ropod_ros_msgs::TaskProgressDOCK();
+    msg.task_id = current_task->task_id;
+    msg.action_id = current_action_id;
+    msg.action_type = "DOCK";
+    msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    msg.task_status.status_code = ropod_ros_msgs::Status::RUNNING;
+    msg.status.status_code  = ropod_ros_msgs::Status::SUCCEEDED;
+    feedback->feedback = msg;
+    dockFeedbackCb(feedback);
+
+    ropod_ros_msgs::DockResultPtr result(new ropod_ros_msgs::DockResult());
+    result->success = true;
+    dockResultCb(actionlib::SimpleClientGoalState::SUCCEEDED, result);
+#else
+    TaskExecutor::startDockAction(action);
+#endif
+}
+
+void TaskExecutorSim::startUndockAction(const ropod_ros_msgs::Action& action)
+{
+    ROS_ERROR("[TaskExecutorSim] startUndockAction() called...");
+
+#ifdef SEND_DUMMY_DOCK_FEEDBACK_AND_RESULT
+    ropod_ros_msgs::DockFeedbackPtr feedback(new ropod_ros_msgs::DockFeedback());
+    ropod_ros_msgs::TaskProgressDOCK msg = ropod_ros_msgs::TaskProgressDOCK();
+    msg.task_id = current_task->task_id;
+    msg.action_id = current_action_id;
+    msg.action_type = "UNDOCK";
+    msg.task_status.module_code = ropod_ros_msgs::Status::TASK_EXECUTOR;
+    msg.task_status.status_code = ropod_ros_msgs::Status::RUNNING;
+    msg.status.status_code  = ropod_ros_msgs::Status::SUCCEEDED;
+    feedback->feedback = msg;
+    dockFeedbackCb(feedback);
+
+    ropod_ros_msgs::DockResultPtr result(new ropod_ros_msgs::DockResult());
+    result->success = true;
+    //dockResultCb(actionlib::SimpleClientGoalState::SUCCEEDED, result);
+#else
+    TaskExecutor::startUndockAction(action);
+#endif
 }
 
 int main(int argc, char **argv)
