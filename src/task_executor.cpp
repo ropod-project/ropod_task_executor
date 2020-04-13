@@ -491,6 +491,8 @@ void TaskExecutor::goToFeedbackCb(const ropod_ros_msgs::GoToFeedbackConstPtr& fe
 {
     ropod_ros_msgs::TaskProgressGOTO msg = feedback->feedback;
     msg.task_id = current_task->task_id;
+    msg.action_id = current_action_id;
+    msg.action_type = "GOTO";
     if (msg.status.module_code == ropod_ros_msgs::Status::ROUTE_NAVIGATION &&
     		(msg.status.status_code == ropod_ros_msgs::Status::FAILED ||
              msg.status.status_code == ropod_ros_msgs::Status::GOAL_NOT_REACHABLE))
