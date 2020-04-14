@@ -1,6 +1,6 @@
 #include <ropod_task_executor/task_executor_sim.h>
 
-#define SEND_DUMMY_GOTO_FEEDBACK_AND_RESULT 1
+//#define SEND_DUMMY_GOTO_FEEDBACK_AND_RESULT 1
 #define SEND_DUMMY_DOCK_FEEDBACK_AND_RESULT 1
 #define SEND_DUMMY_UNDOCK_FEEDBACK_AND_RESULT 1
 
@@ -41,9 +41,8 @@ bool TaskExecutorSim::initElevatorClient()
 
 void TaskExecutorSim::startGotoAction(const ropod_ros_msgs::Action& action)
 {
-    ROS_ERROR("[TaskExecutorSim] startGotoAction() called...");
-
 #ifdef SEND_DUMMY_GOTO_FEEDBACK_AND_RESULT
+    ROS_INFO("[TaskExecutorSim] Publishing dummy feedback followed by result for GOTO action ...");
     ropod_ros_msgs::GoToFeedbackPtr feedback(new ropod_ros_msgs::GoToFeedback());
     ropod_ros_msgs::TaskProgressGOTO msg = ropod_ros_msgs::TaskProgressGOTO();
     msg.task_id = current_task->task_id;
@@ -65,9 +64,8 @@ void TaskExecutorSim::startGotoAction(const ropod_ros_msgs::Action& action)
 
 void TaskExecutorSim::startDockAction(const ropod_ros_msgs::Action& action)
 {
-    ROS_ERROR("[TaskExecutorSim] startDockAction() called...");
-
 #ifdef SEND_DUMMY_DOCK_FEEDBACK_AND_RESULT
+    ROS_INFO("[TaskExecutorSim] Publishing dummy feedback followed by result for DOCK action ...");
     ropod_ros_msgs::DockFeedbackPtr feedback(new ropod_ros_msgs::DockFeedback());
     ropod_ros_msgs::TaskProgressDOCK msg = ropod_ros_msgs::TaskProgressDOCK();
     msg.task_id = current_task->task_id;
@@ -89,9 +87,8 @@ void TaskExecutorSim::startDockAction(const ropod_ros_msgs::Action& action)
 
 void TaskExecutorSim::startUndockAction(const ropod_ros_msgs::Action& action)
 {
-    ROS_ERROR("[TaskExecutorSim] startUndockAction() called...");
-
-#ifdef SEND_DUMMY_DOCK_FEEDBACK_AND_RESULT
+#ifdef SEND_DUMMY_UNDOCK_FEEDBACK_AND_RESULT
+    ROS_INFO("[TaskExecutorSim] Publishing dummy feedback followed by result for UNDOCK action ...");
     ropod_ros_msgs::DockFeedbackPtr feedback(new ropod_ros_msgs::DockFeedback());
     ropod_ros_msgs::TaskProgressDOCK msg = ropod_ros_msgs::TaskProgressDOCK();
     msg.task_id = current_task->task_id;
